@@ -22,11 +22,9 @@ from keras.layers import Input, Dense, Activation, MaxPooling2D, Conv2D, BatchNo
 from keras.layers import Concatenate, Cropping2D, Lambda
 from keras.losses import categorical_crossentropy
 from keras.preprocessing.image import ImageDataGenerator
+from keras.callbacks import ModelCheckpoint
+import pandas as pd
 
-
-# Sample execution:
-# python generate_tuned_model.py --in_dir ../data/ypejnini/ --out_geo_path ./tiles/temp.geojson --in_model_path ./data/naip_autoencoder.h5 --in_tile_path ./tiles/m_3807537_ne_18_1_20170611.mrf --out_model_path ./data/naip_autoencoder_tuned.h5 --num_classes 5 --gpu 1
-# python generate_tuned_model.py --in_dir ../data/ypejnini/ --out_geo_path ./tiles/temp.geojson --in_model_path ./data/naip_autoencoder.h5 --in_tile_path ./tiles/m_3807537_ne_18_1_20170611.mrf --out_model_path ./data/naip_autoencoder_tuned_2.h5 --num_classes 5 --gpu 1
 def masked_categorical_crossentropy(y_true, y_pred):
     
     mask = K.all(K.equal(y_true, [1,0,0,0,0,0]), axis=-1)
@@ -37,49 +35,6 @@ def masked_categorical_crossentropy(y_true, y_pred):
     return K.sum(loss) / K.sum(mask)
 
 keras.losses.masked_categorical_crossentropy = masked_categorical_crossentropy
-
-# Supports 1 file only
-def genGeoJson(in_dir,out_geo_path):
-    output = {
-        "type": "FeatureCollection",
-        "name": out_geo_path.split(".")[0],
-        "crs": { "type": "name", "properties": {"name":"urn:ogc:def:crs:EPSG::3857"}},
-        "features": []
-    }
-    fns = [
-        fn 
-        for fn in glob.glob(in_dir + "*.p") 
-        if "request_list" in fn
-        ]
-    fns = sorted(fns, key=lambda x: int(x.split("_")[1]))
-    request_list = joblib.load(fns[-1])
-    for request in request_list:
-        if request["type"] == "correction":
-            feature = {
-                "type": "Feature",
-                "geometry": {
-                    "type": "Point",
-                    "coordinates": None
-                },
-                "properties": { "user_label": (1 if request["value"] == 4 else 0)}
-            }
-            xmin = request["extent"]["xmin"]
-            xmax = request["extent"]["xmax"]
-            ymin = request["extent"]["ymin"]
-            ymax = request["extent"]["ymax"]
-            polygon = [[xmin,ymax],[xmax,ymax],[xmax,ymin],[xmin,ymin],[xmin,ymax]]
-
-            point = [
-                (xmin+xmax)/2,
-                (ymin+ymax)/2
-            ]
-
-            feature["geometry"]["coordinates"] = point
-
-            output["features"].append(feature)
-    
-    with open(out_geo_path, "w") as f:
-        f.write(json.dumps(output))
 
 def get_loss(mask_value):
     mask_value = K.variable(mask_value)
@@ -107,6 +62,64 @@ def get_model(model_path, num_classes):
     
     return model
 
+def build_train_set(coords, labels, samples, method='uneven', target_cls=4):
+    
+    unique_cls, count = np.unique(labels, return_counts=True)
+    
+    if (method == 'even' and ((samples // len(unique_cls)) > min(count))):
+        raise Exception('Too many samples requested')
+    elif (method == 'uneven' and ((samples // 2) > count[target_cls])
+             or ((samples // 2)> (sum(count) - count[target_cls]))):
+        raise Exception('Too many samples requested')
+    elif samples > coords.shape[0]:
+        raise Exception('Too many samples requested')
+    
+    coords_samples = np.zeros((samples,2), dtype=np.int32)
+    labels_samples = np.zeros(samples)
+    
+    # Sampling without replacement?
+    used_idx = set()
+    
+    # Uneven sampling
+    if method == 'uneven':
+        each_class_size = samples // 2
+
+        # Random subsampling chicken classes first
+        for i in range(each_class_size):
+            rand_idx = np.random.randint(coords.shape[0])
+            while(labels[rand_idx] != target_cls or (rand_idx in used_idx)):
+                rand_idx = np.random.randint(coords.shape[0])
+            coords_samples[i] = coords[rand_idx]
+            labels_samples[i] = labels[rand_idx]
+            used_idx.add(rand_idx) # sampling without replacement?
+
+        # Random subsampling from all non chicken classes
+        for i in range(each_class_size):
+            rand_idx = np.random.randint(coords.shape[0])
+            while (labels[rand_idx] == target_cls or (rand_idx in used_idx)):
+                rand_idx = np.random.randint(coords.shape[0])
+            coords_samples[i+each_class_size] = coords[rand_idx]
+            labels_samples[i+each_class_size] = labels[rand_idx]
+            used_idx.add(rand_idx)
+            
+    # Even sampling
+    elif method == 'even':
+        # Random subsampling of all classes
+        each_class_size = samples // len(unique_cls)
+        for c in (unique_cls):
+            for i in range(each_class_size):
+                rand_idx = np.random.randint(coords.shape[0])
+                while(labels[rand_idx] != c or (rand_idx in used_idx)):
+                    rand_idx = np.random.randint(coords.shape[0])
+                coords_samples[c*each_class_size + i] = coords[rand_idx]
+                labels_samples[c*each_class_size + i] = labels[rand_idx]
+                used_idx.add(rand_idx) # sampling without replacement?
+    else:
+        raise Exception('Sampling method not specified')
+        
+    
+    return coords_samples, labels_samples
+
 def train_model_from_points(in_geo_path, in_model_path, in_tile_path, out_model_path, num_classes):
     print("Loading initial model...")
     model = get_model(in_model_path, num_classes)
@@ -118,12 +131,12 @@ def train_model_from_points(in_geo_path, in_model_path, in_tile_path, out_model_
     profile = f.profile
     transform = f.profile["transform"]
     src_crs = f.crs.to_string()
-    f.close
+    f.close()
 
     print("Loading new GeoJson file...")
     f = fiona.open(in_geo_path)
-    coords = []
-    labels = []
+    temp_coords = []
+    temp_labels = []
     for line in f:
         label = line["properties"]["user_label"]
         geom = fiona.transform.transform_geom(f.crs["init"], src_crs, line["geometry"])
@@ -131,12 +144,19 @@ def train_model_from_points(in_geo_path, in_model_path, in_tile_path, out_model_
         y, x = ~transform * (lon, lat)
         y = int(y)
         x = int(x)
-        coords.append((x,y))
-        labels.append(label)
+        temp_coords.append((x,y))
+        temp_labels.append(label)
     f.close()
 
-    coords = np.array(coords)
-    labels = np.array(labels)
+    temp_coords = np.array(temp_coords)
+    temp_labels = np.array(temp_labels)
+
+    coords, labels = build_train_set(temp_coords, temp_labels, 750, method='uneven')
+
+    print(coords.shape, labels.shape)
+    print(pd.Series(labels).value_counts())
+
+    labels = np.where(labels != 4, 0, 1)
 
     # x-dim, y-dim, # of bands
     # x_train = np.zeros((coords.shape[0], 150, 150, 4), dtype=np.float32)
@@ -164,9 +184,12 @@ def train_model_from_points(in_geo_path, in_model_path, in_tile_path, out_model_
 
     print("Tuning model")
 
+    checkpointer = ModelCheckpoint(filepath='./tmp_sup_uneven/sup_tuned_model_uneven_{epoch:02d}_{loss:.2f}.h5', monitor='loss', verbose=1)
+
     model.fit(
         x_train, y_train,
-        batch_size=10, epochs=5, verbose=1, validation_split=0
+        batch_size=10, epochs=10, verbose=1, validation_split=0,
+        callbacks=[checkpointer]
     )
 
     model.save(out_model_path)
@@ -175,8 +198,7 @@ def train_model_from_points(in_geo_path, in_model_path, in_tile_path, out_model_
 def main():
     parser = argparse.ArgumentParser(description="Generate a model tuned using webtool")
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose debugging", default=False)
-    parser.add_argument("--in_dir", action="store", dest="in_dir", type= str, help="Path to user pickle file folder (takes newest file)", required=True)
-    parser.add_argument("--out_geo_path", action="store", dest="out_geo_path", type=str, help="Output geojson path (i.e. ../data/output.geojson)", required=True)
+    parser.add_argument("--in_geo_path", action="store", dest="in_geo_path", type=str, help="Input geojson path (i.e. ../data/output.geojson)", required=True)
     parser.add_argument("--in_model_path", action="store", dest="in_model_path", type=str, help="Path to model that needs retraining", required=True)
     parser.add_argument("--in_tile_path", action="store", dest="in_tile_path", type=str, help="Path to input tif file", required=True)
     parser.add_argument("--out_model_path", action="store", dest="out_model_path", type=str, help="Output path for tuned model", required=True)
@@ -192,14 +214,12 @@ def main():
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = "3"
 
     start_time = float(time.time())
-    
-    genGeoJson(args.in_dir, args.out_geo_path)
 
-    print("GeoJson file created at {}".format(args.out_geo_path))
+    print("GeoJson file read at {}".format(args.in_geo_path))
 
     print("Retraining model from GeoJson")
 
-    train_model_from_points(args.out_geo_path, args.in_model_path, args.in_tile_path, args.out_model_path, int(args.num_classes))
+    train_model_from_points(args.in_geo_path, args.in_model_path, args.in_tile_path, args.out_model_path, int(args.num_classes))
 
     print("Finished in %0.4f seconds" % (time.time() - start_time))
     
