@@ -159,12 +159,12 @@ def train_model_from_points(in_geo_path, in_model_path, in_tile_path, out_model_
     labels = np.where(labels != 4, 0, 1)
 
     # x-dim, y-dim, # of bands
-    # x_train = np.zeros((coords.shape[0], 150, 150, 4), dtype=np.float32)
-    x_train = np.zeros((coords.shape[0], 240, 240, 4), dtype=np.float32)
+    x_train = np.zeros((coords.shape[0], 150, 150, 4), dtype=np.float32)
+    # x_train = np.zeros((coords.shape[0], 240, 240, 4), dtype=np.float32)
 
     # x-dim, y-dim, # of classes + dummy index
-    # y_train = np.zeros((coords.shape[0], 150, 150, num_classes+1), dtype=np.uint8)
-    y_train = np.zeros((coords.shape[0], 240, 240, num_classes+1), dtype=np.uint8)
+    y_train = np.zeros((coords.shape[0], 150, 150, num_classes+1), dtype=np.uint8)
+    # y_train = np.zeros((coords.shape[0], 240, 240, num_classes+1), dtype=np.uint8)
 
     y_train[:,:,:] = [1] + [0] * (y_train.shape[-1]-1)
 
@@ -172,19 +172,19 @@ def train_model_from_points(in_geo_path, in_model_path, in_tile_path, out_model_
         y,x = coords[i]
         label = labels[i]
 
-        # x_train[i] = data[y-75:y+74+1, x-75:x+74+1, :].copy()
+        x_train[i] = data[y-75:y+74+1, x-75:x+74+1, :].copy()
 
-        # y_train[i,75,75,0] = 0
-        # y_train[i,75,75,label+1] = 1
-        x_train[i] = data[y-120:y+119+1, x-120:x+119+1, :].copy()
-        y_train[i,120,120,0] = 0
-        y_train[i,120,120,label+1] = 1
+        y_train[i,75,75,0] = 0
+        y_train[i,75,75,label+1] = 1
+        # x_train[i] = data[y-120:y+119+1, x-120:x+119+1, :].copy()
+        # y_train[i,120,120,0] = 0
+        # y_train[i,120,120,label+1] = 1
         
     x_train = x_train / 255.0
 
     print("Tuning model")
 
-    checkpointer = ModelCheckpoint(filepath='./tmp_sup_uneven/sup_tuned_model_uneven_{epoch:02d}_{loss:.2f}.h5', monitor='loss', verbose=1)
+    checkpointer = ModelCheckpoint(filepath='./tmp_ae_uneven/ae_tuned_model_uneven_{epoch:02d}_{loss:.2f}.h5', monitor='loss', verbose=1)
 
     model.fit(
         x_train, y_train,
