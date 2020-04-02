@@ -120,7 +120,7 @@ def build_train_set(coords, labels, samples, method='uneven', target_cls=4):
     
     return coords_samples, labels_samples
 
-def train_model_from_points(in_geo_path, in_model_path, in_tile_path, out_model_path, num_classes):
+def train_model_from_points(in_geo_path, in_model_path, in_tile_path, out_model_path, num_classes, exp):
     print("Loading initial model...")
     model = get_model(in_model_path, num_classes)
     model.summary()
@@ -151,7 +151,7 @@ def train_model_from_points(in_geo_path, in_model_path, in_tile_path, out_model_
     temp_coords = np.array(temp_coords)
     temp_labels = np.array(temp_labels)
 
-    coords, labels = build_train_set(temp_coords, temp_labels, 750, method='uneven')
+    coords, labels = build_train_set(temp_coords, temp_labels, 750, method='even')
 
     print(coords.shape, labels.shape)
     print(pd.Series(labels).value_counts())
@@ -159,12 +159,12 @@ def train_model_from_points(in_geo_path, in_model_path, in_tile_path, out_model_
     labels = np.where(labels != 4, 0, 1)
 
     # x-dim, y-dim, # of bands
-    x_train = np.zeros((coords.shape[0], 150, 150, 4), dtype=np.float32)
-    # x_train = np.zeros((coords.shape[0], 240, 240, 4), dtype=np.float32)
+    # x_train = np.zeros((coords.shape[0], 150, 150, 4), dtype=np.float32)
+    x_train = np.zeros((coords.shape[0], 240, 240, 4), dtype=np.float32)
 
     # x-dim, y-dim, # of classes + dummy index
-    y_train = np.zeros((coords.shape[0], 150, 150, num_classes+1), dtype=np.uint8)
-    # y_train = np.zeros((coords.shape[0], 240, 240, num_classes+1), dtype=np.uint8)
+    # y_train = np.zeros((coords.shape[0], 150, 150, num_classes+1), dtype=np.uint8)
+    y_train = np.zeros((coords.shape[0], 240, 240, num_classes+1), dtype=np.uint8)
 
     y_train[:,:,:] = [1] + [0] * (y_train.shape[-1]-1)
 
@@ -172,19 +172,21 @@ def train_model_from_points(in_geo_path, in_model_path, in_tile_path, out_model_
         y,x = coords[i]
         label = labels[i]
 
-        x_train[i] = data[y-75:y+74+1, x-75:x+74+1, :].copy()
+        # x_train[i] = data[y-75:y+74+1, x-75:x+74+1, :].copy()
 
-        y_train[i,75,75,0] = 0
-        y_train[i,75,75,label+1] = 1
-        # x_train[i] = data[y-120:y+119+1, x-120:x+119+1, :].copy()
-        # y_train[i,120,120,0] = 0
-        # y_train[i,120,120,label+1] = 1
+        # y_train[i,75,75,0] = 0
+        # y_train[i,75,75,label+1] = 1
+        x_train[i] = data[y-120:y+119+1, x-120:x+119+1, :].copy()
+        y_train[i,120,120,0] = 0
+        y_train[i,120,120,label+1] = 1
         
     x_train = x_train / 255.0
 
     print("Tuning model")
 
-    checkpointer = ModelCheckpoint(filepath='./tmp_ae_uneven/ae_tuned_model_uneven_{epoch:02d}_{loss:.2f}.h5', monitor='loss', verbose=1)
+    cpPath = "./{}".format(exp)
+
+    checkpointer = ModelCheckpoint(filepath=(cpPath+"/tmp_sup_even/sup_tuned_model_even_{epoch:02d}_{loss:.2f}.h5"), monitor='loss', verbose=1)
 
     model.fit(
         x_train, y_train,
@@ -204,6 +206,8 @@ def main():
     parser.add_argument("--out_model_path", action="store", dest="out_model_path", type=str, help="Output path for tuned model", required=True)
     parser.add_argument("--num_classes", action="store", dest="num_classes", type=str, help="Number of classes", required=True)
     parser.add_argument("--gpu", action="store", dest="gpuid", type=int, help="GPU to use", required=True)
+    # Experiment argument
+    parser.add_argument("--exp", action="store",dest="exp", type=str, required=True)
     
     args = parser.parse_args(sys.argv[1:])
     args.batch_size=10
@@ -219,7 +223,7 @@ def main():
 
     print("Retraining model from GeoJson")
 
-    train_model_from_points(args.in_geo_path, args.in_model_path, args.in_tile_path, args.out_model_path, int(args.num_classes))
+    train_model_from_points(args.in_geo_path, args.in_model_path, args.in_tile_path, args.out_model_path, int(args.num_classes), args.exp)
 
     print("Finished in %0.4f seconds" % (time.time() - start_time))
     
