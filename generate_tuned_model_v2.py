@@ -55,7 +55,7 @@ def get_model(model_path, num_classes):
     toutput = Conv2D(num_classes+1, (1,1), padding="same", use_bias=True, activation="softmax", name="output_conv")(toutput)
     model = keras.models.Model(inputs=tmodel.inputs, outputs=[toutput])
 
-    optimizer = Adam(lr=0.001)
+    optimizer = Adam(lr=0.0001)
     loss_mask = np.zeros(num_classes+1)
     loss_mask[0] = 1
     model.compile(loss=get_loss(loss_mask), optimizer=optimizer)
@@ -120,10 +120,11 @@ def build_train_set(coords, labels, samples, method='uneven', target_cls=4):
     
     return coords_samples, labels_samples
 
-def train_model_from_points(in_geo_path, in_model_path, in_tile_path, out_model_path, num_classes, exp):
-    print("Loading initial model...")
-    model = get_model(in_model_path, num_classes)
-    model.summary()
+def train_model_from_points(in_geo_path, in_model_path_sup, in_model_path_ae, in_tile_path, out_model_path_sup, out_model_path_ae, num_classes, exp, even):
+    # Train supervised
+    print("Loading initial models...")
+    model_sup = get_model(in_model_path_sup, num_classes)
+    model_sup.summary()
 
     print("Loading tiles...")
     f = rasterio.open(in_tile_path)
@@ -133,6 +134,7 @@ def train_model_from_points(in_geo_path, in_model_path, in_tile_path, out_model_
     src_crs = f.crs.to_string()
     f.close()
 
+    # Extracting labels
     print("Loading new GeoJson file...")
     f = fiona.open(in_geo_path)
     temp_coords = []
@@ -151,7 +153,7 @@ def train_model_from_points(in_geo_path, in_model_path, in_tile_path, out_model_
     temp_coords = np.array(temp_coords)
     temp_labels = np.array(temp_labels)
 
-    coords, labels = build_train_set(temp_coords, temp_labels, 750, method='even')
+    coords, labels = build_train_set(temp_coords, temp_labels, 750, method=even)
 
     print(coords.shape, labels.shape)
     print(pd.Series(labels).value_counts())
@@ -159,56 +161,84 @@ def train_model_from_points(in_geo_path, in_model_path, in_tile_path, out_model_
     labels = np.where(labels != 4, 0, 1)
 
     # x-dim, y-dim, # of bands
-    # x_train = np.zeros((coords.shape[0], 150, 150, 4), dtype=np.float32)
+    x_train_ae = np.zeros((coords.shape[0], 150, 150, 4), dtype=np.float32)
     x_train = np.zeros((coords.shape[0], 240, 240, 4), dtype=np.float32)
 
     # x-dim, y-dim, # of classes + dummy index
-    # y_train = np.zeros((coords.shape[0], 150, 150, num_classes+1), dtype=np.uint8)
+    y_train_ae = np.zeros((coords.shape[0], 150, 150, num_classes+1), dtype=np.uint8)
     y_train = np.zeros((coords.shape[0], 240, 240, num_classes+1), dtype=np.uint8)
 
+    y_train_ae[:,:,:] = [1] + [0] * (y_train_ae.shape[-1]-1)
     y_train[:,:,:] = [1] + [0] * (y_train.shape[-1]-1)
 
     for i in range(coords.shape[0]):
         y,x = coords[i]
         label = labels[i]
 
-        # x_train[i] = data[y-75:y+74+1, x-75:x+74+1, :].copy()
+        # Unsupervised 
+        x_train_ae[i] = data[y-75:y+74+1, x-75:x+74+1, :].copy()
+        y_train_ae[i,75,75,0] = 0
+        y_train_ae[i,75,75,label+1] = 1
 
-        # y_train[i,75,75,0] = 0
-        # y_train[i,75,75,label+1] = 1
+        # Supervised
         x_train[i] = data[y-120:y+119+1, x-120:x+119+1, :].copy()
         y_train[i,120,120,0] = 0
         y_train[i,120,120,label+1] = 1
         
     x_train = x_train / 255.0
+    x_train_ae = x_train_ae / 255.0
 
-    print("Tuning model")
+    # Supervised tuning
 
-    cpPath = "./{}".format(exp)
+    print("Tuning supervised model")
 
-    checkpointer = ModelCheckpoint(filepath=(cpPath+"/tmp_sup_even/sup_tuned_model_even_{epoch:02d}_{loss:.2f}.h5"), monitor='loss', verbose=1)
+    cpPath = f"./new/{exp}/tmp_sup_{even}/sup_tuned_model_{even}_"
 
-    model.fit(
+    checkpointer_sup = ModelCheckpoint(filepath=(cpPath+"{epoch:02d}_{loss:.2f}.h5"), monitor='loss', verbose=1)
+
+    model_sup.fit(
         x_train, y_train,
         batch_size=10, epochs=10, verbose=1, validation_split=0,
-        callbacks=[checkpointer]
+        callbacks=[checkpointer_sup]
     )
 
-    model.save(out_model_path)
+    model_sup.save(out_model_path_sup)
+
+    # Unsupervised tuning
+
+    print("Tuning Unsupervised model")
+
+    model_ae = get_model(in_model_path_ae, num_classes)
+    model_ae.summary()
+
+    cpPath = f"./new/{exp}/tmp_ae_{even}/ae_tuned_model_{even}_"
+
+    checkpointer_ae = ModelCheckpoint(filepath=(cpPath+"{epoch:02d}_{loss:.2f}.h5"), monitor='loss', verbose=1)
+
+    model_ae.fit(
+        x_train_ae, y_train_ae,
+        batch_size=10, epochs=10, verbose=1, validation_split=0,
+        callbacks=[checkpointer_ae]
+    )
+
+    model_ae.save(out_model_path_ae)
 
 
 def main():
     parser = argparse.ArgumentParser(description="Generate a model tuned using webtool")
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose debugging", default=False)
     parser.add_argument("--in_geo_path", action="store", dest="in_geo_path", type=str, help="Input geojson path (i.e. ../data/output.geojson)", required=True)
-    parser.add_argument("--in_model_path", action="store", dest="in_model_path", type=str, help="Path to model that needs retraining", required=True)
+    parser.add_argument("--in_model_path_sup", action="store", dest="in_model_path_sup", type=str, help="Path to supervised model that needs retraining", required=True)
+    parser.add_argument("--in_model_path_ae", action="store", dest="in_model_path_ae", type=str, help="Path to unsupervised model that needs retraining", required=True)
     parser.add_argument("--in_tile_path", action="store", dest="in_tile_path", type=str, help="Path to input tif file", required=True)
-    parser.add_argument("--out_model_path", action="store", dest="out_model_path", type=str, help="Output path for tuned model", required=True)
+    parser.add_argument("--out_model_path_sup", action="store", dest="out_model_path_sup", type=str, help="Output path for tuned supervised model", required=True)
+    parser.add_argument("--out_model_path_ae", action="store", dest="out_model_path_ae", type=str, help="Output path for tuned unsupervised model", required=True)
     parser.add_argument("--num_classes", action="store", dest="num_classes", type=str, help="Number of classes", required=True)
     parser.add_argument("--gpu", action="store", dest="gpuid", type=int, help="GPU to use", required=True)
     # Experiment argument
     parser.add_argument("--exp", action="store",dest="exp", type=str, required=True)
-    
+    parser.add_argument("--even", action="store",dest="evenodd", type=str, required=True)
+
     args = parser.parse_args(sys.argv[1:])
     args.batch_size=10
     args.num_epochs=30
@@ -223,7 +253,7 @@ def main():
 
     print("Retraining model from GeoJson")
 
-    train_model_from_points(args.in_geo_path, args.in_model_path, args.in_tile_path, args.out_model_path, int(args.num_classes), args.exp)
+    train_model_from_points(args.in_geo_path, args.in_model_path_sup, args.in_model_path_ae, args.in_tile_path, args.out_model_path_sup, args.out_model_path_ae, int(args.num_classes), args.exp, args.evenodd)
 
     print("Finished in %0.4f seconds" % (time.time() - start_time))
     
