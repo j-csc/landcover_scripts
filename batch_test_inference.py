@@ -2,24 +2,7 @@ import subprocess
 import glob
 
 def main():
-    exps = (glob.glob("experiment*"))
-
-    # Batch test inference
-    # for e in exps:
-    #     if e != "experiment1":
-    #         temp_files = glob.glob("./"+e + "/tmp_*/")
-    #         print(e)
-    #         for f in temp_files:
-    #             all_models = glob.glob(f+"*")
-    #             for model in all_models:
-    #                 mtype = (model.split("/")[2][4:])
-    #                 mname = (model.split("/")[3][:-3])
-    #                 out_fn = ("./" + e + "/test_inference_" + mtype + "/" + mname + ".tif")
-    #                 subprocess.call(["python","./test_inference.py",
-    #                 "--input_fns", "../landcover-old/web_tool/tiles/m_3807537_ne_18_1_20170611.mrf",
-    #                 "--output_fns", out_fn,
-    #                 "--model", model,
-    #                 "--gpu", "1"])
+    exps = (glob.glob("./new/experiment*"))
 
     # Generate model
     for e in exps:
@@ -47,6 +30,23 @@ def main():
         "--gpu", "1",
         "--exp", e,
         "--even", "uneven"])
+
+    # Batch test inference
+    # for e in exps:
+    #     temp_files = glob.glob(e + "/tmp_*/")
+    #     print(e)
+    #     for f in temp_files:
+    #         all_models = glob.glob(f+"*")
+    #         for model in all_models:
+    #             mtype = (model.split("/")[3][4:])
+    #             mname = (model.split("/")[4][:-3])
+    #             out_fn = (e + "/test_inference_" + mtype + "/" + mname + ".tif")
+    #             subprocess.call(["python","./test_inference.py",
+    #             "--input_fns", "../landcover-old/web_tool/tiles/m_3807537_ne_18_1_20170611.mrf",
+    #             "--output_fns", out_fn,
+    #             "--model", model,
+    #             "--gpu", "1"])
+
     pass
 
 if __name__ == "__main__":

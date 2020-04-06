@@ -55,7 +55,7 @@ def get_model(model_path, num_classes):
     toutput = Conv2D(num_classes+1, (1,1), padding="same", use_bias=True, activation="softmax", name="output_conv")(toutput)
     model = keras.models.Model(inputs=tmodel.inputs, outputs=[toutput])
 
-    optimizer = Adam(lr=0.0001)
+    optimizer = Adam(lr=0.001)
     loss_mask = np.zeros(num_classes+1)
     loss_mask[0] = 1
     model.compile(loss=get_loss(loss_mask), optimizer=optimizer)
