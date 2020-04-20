@@ -1,29 +1,66 @@
 import subprocess
 import glob
+import sys, os, time
+from multiprocessing import Process, Queue
+ 
+def do_work(work, gpu_idx):
+    while not work.empty():
+        fn = work.get()
+        filename = (fn.split("/")[-1].split(".")[0])
+        out_fn = f"./all_test_inference/{filename}_inference.tif"
+        subprocess.call(["python","./test_inference.py",
+            "--input_fns", fn,
+            "--output_fns", out_fn,
+            "--model", "./new/experiment10/tmp_ae_even/ae_tuned_model_even_08_0.17.h5",
+            "--gpu", str(gpu_idx)])
+    return True
+
+def batch_run(ALL_FNS):
+    work = Queue()
+    GPUS = [0 ,1,2,3]
+    for fn in ALL_FNS:
+        work.put(fn)
+    processes = []
+    for gpu_idx in GPUS:
+        p = Process(target=do_work, args=(work, gpu_idx))
+        processes.append(p)
+        p.start()
+    for p in processes:
+        p.join()
 
 def main():
-    exps = (glob.glob("./new/experiment*"))
-    subprocess.call(["python","./test_inference.py",
-                "--input_fns", "../../../media/disk2/datasets/maaryland_naip_2017/38075/m_3807536_se_18_1_20170611.mrf",
-                "--output_fns", "./m_3807536_se_18_1_20170611_sup_even_best.tif",
-                "--model", "./new/experiment9/tmp_sup_even/sup_tuned_model_even_09_0.11.h5",
-                "--gpu", "1"])
-    subprocess.call(["python","./test_inference.py",
-                "--input_fns", "../../../media/disk2/datasets/maaryland_naip_2017/38075/m_3807536_se_18_1_20170611.mrf",
-                "--output_fns", "./m_3807536_se_18_1_20170611_sup_uneven_best.tif",
-                "--model", "./new/experiment9/tmp_sup_uneven/sup_tuned_model_uneven_03_0.24.h5",
-                "--gpu", "1"])
-    subprocess.call(["python","./test_inference.py",
-                "--input_fns", "../../../media/disk2/datasets/maaryland_naip_2017/38075/m_3807536_se_18_1_20170611.mrf",
-                "--output_fns", "./m_3807536_se_18_1_20170611_ae_even_best.tif",
-                "--model", "./new/experiment10/tmp_ae_even/ae_tuned_model_even_08_0.17.h5",
-                "--gpu", "1"])
+    fn_folders = glob.glob("../../../media/disk2/datasets/maaryland_naip_2017/*")
+    all_fns = []
+    for fn_folder in fn_folders:
+        fns = (glob.glob(fn_folder + "/*.mrf"))
+        for fn in fns:
+            all_fns.append(fn)
+    batch_run(all_fns)
 
-    subprocess.call(["python","./test_inference.py",
-                "--input_fns", "../../../media/disk2/datasets/maaryland_naip_2017/38075/m_3807536_se_18_1_20170611.mrf",
-                "--output_fns", "./m_3807536_se_18_1_20170611_ae_uneven_best.tif",
-                "--model", "./new/experiment3/tmp_ae_uneven/ae_tuned_model_uneven_03_0.20.h5",
-                "--gpu", "1"])
+
+    # Small batch inference
+    # exps = (glob.glob("./new/experiment*"))
+    # subprocess.call(["python","./test_inference.py",
+    #             "--input_fns", "../../../media/disk2/datasets/maaryland_naip_2017/38075/m_3807536_se_18_1_20170611.mrf",
+    #             "--output_fns", "./m_3807536_se_18_1_20170611_sup_even_best.tif",
+    #             "--model", "./new/experiment9/tmp_sup_even/sup_tuned_model_even_09_0.11.h5",
+    #             "--gpu", "1"])
+    # subprocess.call(["python","./test_inference.py",
+    #             "--input_fns", "../../../media/disk2/datasets/maaryland_naip_2017/38075/m_3807536_se_18_1_20170611.mrf",
+    #             "--output_fns", "./m_3807536_se_18_1_20170611_sup_uneven_best.tif",
+    #             "--model", "./new/experiment9/tmp_sup_uneven/sup_tuned_model_uneven_03_0.24.h5",
+    #             "--gpu", "1"])
+    # subprocess.call(["python","./test_inference.py",
+    #             "--input_fns", "../../../media/disk2/datasets/maaryland_naip_2017/38075/m_3807536_se_18_1_20170611.mrf",
+    #             "--output_fns", "./m_3807536_se_18_1_20170611_ae_even_best.tif",
+    #             "--model", "./new/experiment10/tmp_ae_even/ae_tuned_model_even_08_0.17.h5",
+    #             "--gpu", "1"])
+
+    # subprocess.call(["python","./test_inference.py",
+    #             "--input_fns", "../../../media/disk2/datasets/maaryland_naip_2017/38075/m_3807536_se_18_1_20170611.mrf",
+    #             "--output_fns", "./m_3807536_se_18_1_20170611_ae_uneven_best.tif",
+    #             "--model", "./new/experiment3/tmp_ae_uneven/ae_tuned_model_uneven_03_0.20.h5",
+    #             "--gpu", "1"])
 
     # Generate model
     # for e in exps:

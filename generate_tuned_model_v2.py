@@ -24,6 +24,10 @@ from keras.losses import categorical_crossentropy
 from keras.preprocessing.image import ImageDataGenerator
 from keras.callbacks import ModelCheckpoint
 import pandas as pd
+from scipy.signal import convolve2d
+import custom_loss
+
+pos_kernels, neg_kernels = custom_loss.get_pos_neg_kernel("../notebooks/Delmarva_PL_House_Final/Delmarva_PL_House_Final.shp")
 
 def masked_categorical_crossentropy(y_true, y_pred):
     
@@ -36,20 +40,37 @@ def masked_categorical_crossentropy(y_true, y_pred):
 
 keras.losses.masked_categorical_crossentropy = masked_categorical_crossentropy
 
+
 def get_loss(mask_value):
     mask_value = K.variable(mask_value)
-    def masked_categorical_crossentropy(y_true, y_pred):
-        
+    def custom_loss_fn(y_true, y_pred):   
         mask = K.all(K.equal(y_true, mask_value), axis=-1)
         mask = 1 - K.cast(mask, K.floatx())
 
         loss = K.categorical_crossentropy(y_true, y_pred) * mask
+        
+        p_loss = 0
+        n_loss = 0
 
-        return K.sum(loss) / K.sum(mask)
-    return masked_categorical_crossentropy
+        print(type(y_pred))
+        for p_kernel in pos_kernels:
+            temp_p_kernel = K.reshape(p_kernel, shape=(50,50))
+            temp_p_kernel = K.cast(temp_p_kernel, 'float32')
+            p_loss -= K.mean(K.conv2d(y_pred[:,:,:,2], (temp_p_kernel),strides=(1,1), padding='valid', data_format="channels_last"))
+        
+        for n_kernel in neg_kernels:
+            temp_n_kernel = K.reshape(n_kernel, shape=(50,50))
+            temp_n_kernel = K.cast(temp_n_kernel, 'float32')
+            n_loss += K.mean(K.conv2d(y_pred[:,:,:,2], (temp_n_kernel),strides=(1,1), padding='valid',data_format="channels_last"))
+        
+        p_loss = p_loss / len(pos_kernels)
+        n_loss = n_loss / len(neg_kernels)
+
+        return ((K.sum(loss) / K.sum(mask)) - p_loss + n_loss)
+    return custom_loss_fn
 
 def get_model(model_path, num_classes):
-    K.clear_session()
+    # K.clear_session()
     tmodel = keras.models.load_model(model_path)
     toutput = tmodel.layers[-2].output
     toutput = Conv2D(num_classes+1, (1,1), padding="same", use_bias=True, activation="softmax", name="output_conv")(toutput)
@@ -58,6 +79,9 @@ def get_model(model_path, num_classes):
     optimizer = Adam(lr=0.001)
     loss_mask = np.zeros(num_classes+1)
     loss_mask[0] = 1
+
+    # OR add shape loss as tensor -> model.add_loss(shape_loss)
+
     model.compile(loss=get_loss(loss_mask), optimizer=optimizer)
     
     return model
