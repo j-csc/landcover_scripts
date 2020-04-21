@@ -29,20 +29,20 @@ def batch_run(ALL_FNS):
         p.join()
 
 def main():
-    fn_folders = glob.glob("../../../media/disk2/datasets/maaryland_naip_2017/*")
-    all_fns = []
-    for fn_folder in fn_folders:
-        fns = (glob.glob(fn_folder + "/*.mrf"))
-        for fn in fns:
-            all_fns.append(fn)
-    batch_run(all_fns)
+    # fn_folders = glob.glob("../../../media/disk2/datasets/maaryland_naip_2017/*")
+    # all_fns = []
+    # for fn_folder in fn_folders:
+    #     fns = (glob.glob(fn_folder + "/*.mrf"))
+    #     for fn in fns:
+    #         all_fns.append(fn)
+    # batch_run(all_fns)
 
 
     # Small batch inference
-    # exps = (glob.glob("./new/experiment*"))
+    exps = (glob.glob("./temp_123/tmp_*"))
     # subprocess.call(["python","./test_inference.py",
-    #             "--input_fns", "../../../media/disk2/datasets/maaryland_naip_2017/38075/m_3807536_se_18_1_20170611.mrf",
-    #             "--output_fns", "./m_3807536_se_18_1_20170611_sup_even_best.tif",
+    #             "--input_fns", "../landcover-old/web_tool/tiles/m_3807537_ne_18_1_20170611.mrf",
+    #             "--output_fns", "./m_3807537_ne_18_1_20170611_sup_even_best.tif",
     #             "--model", "./new/experiment9/tmp_sup_even/sup_tuned_model_even_09_0.11.h5",
     #             "--gpu", "1"])
     # subprocess.call(["python","./test_inference.py",
@@ -51,7 +51,7 @@ def main():
     #             "--model", "./new/experiment9/tmp_sup_uneven/sup_tuned_model_uneven_03_0.24.h5",
     #             "--gpu", "1"])
     # subprocess.call(["python","./test_inference.py",
-    #             "--input_fns", "../../../media/disk2/datasets/maaryland_naip_2017/38075/m_3807536_se_18_1_20170611.mrf",
+    #             "--input_fns", "../landcover-old/web_tool/tiles/m_3807537_ne_18_1_20170611.mrf",
     #             "--output_fns", "./m_3807536_se_18_1_20170611_ae_even_best.tif",
     #             "--model", "./new/experiment10/tmp_ae_even/ae_tuned_model_even_08_0.17.h5",
     #             "--gpu", "1"])
@@ -91,22 +91,19 @@ def main():
         # "--even", "uneven"])
 
     # Batch test inference
-    # for e in exps:
-    #     temp_files = glob.glob(e + "/tmp_*/")
-    #     if (e.split("/")[-1] == "experiment9"):
-    #         for f in temp_files:
-    #             all_models = glob.glob(f+"*")
-    #             print(len(all_models))
-    #             for model in all_models:
-    #                 mtype = (model.split("/")[3][4:])
-    #                 mname = (model.split("/")[4][:-3])
-    #                 out_fn = (e + "/test_inference_" + mtype + "/" + mname + ".tif")
-    #                 print(out_fn)
-    #                 subprocess.call(["python","./test_inference.py",
-    #                 "--input_fns", "../landcover-old/web_tool/tiles/m_3807537_ne_18_1_20170611.mrf",
-    #                 "--output_fns", out_fn,
-    #                 "--model", model,
-    #                 "--gpu", "1"])
+    for e in exps:
+        temp_files = glob.glob(e + "/*")
+        for f in temp_files:
+            mtype = (f.split("/")[2][4:])
+            mname = (f.split("/")[3][:-3])
+            e_folder = (e.split("/")[1])
+            out_fn = ("./" + e_folder + "/test_inference_" + mtype + "/" + mname + ".tif")
+            print(out_fn)
+            subprocess.call(["python","./test_inference.py",
+            "--input_fns", "../landcover-old/web_tool/tiles/m_3807537_ne_18_1_20170611.mrf",
+            "--output_fns", out_fn,
+            "--model", f,
+            "--gpu", "1"])
 
     pass
 

@@ -41,7 +41,7 @@ def generate_rectangle(aspect_ratio, height, width, rotation, min_pixel=100):
         center_x = (max(start_x,end_x) - min(start_x, end_x)) / 2
         center_y = (max(start_y,end_y) - min(start_y, end_y)) / 2
 
-        rec = cv2.rectangle(img, (start_x, start_y), (end_x, end_y), (255,255,255), -1)
+        rec = cv2.rectangle(img, (start_x, start_y), (end_x, end_y), (10,10,10), -1)
         img = rotate(image=img, angle=rotation)
         
         # Make sure there's no empty images (at least 100 pixels are in img)
@@ -55,8 +55,8 @@ def generate_rectangle(aspect_ratio, height, width, rotation, min_pixel=100):
     return img
 
 def generate_circle(x,y,r,height,width):
-    img = np.zeros((150, 150), dtype=np.uint8)
-    circle = cv2.circle(img, (x,y), r, (255, 255, 255), -1) 
+    img = np.zeros((height, width), dtype=np.uint8)
+    circle = cv2.circle(img, (x,y), r, (10, 10, 10), -1) 
     return img
 
 def get_pos_neg_kernel(shp_file):
@@ -87,16 +87,17 @@ def get_pos_neg_kernel(shp_file):
 
     # Obtain positive kernel library
     pos_kernel = []
-    for i in range(10):
+    for i in range(30):
         rect = generate_rectangle(np.random.choice(aspect_ratios), 50, 50, np.random.randint(360))
         pos_kernel.append(rect)
 
     # Obtain negative kernel library
     neg_kernel = []
-    for i in range(10):
+    for i in range(30):
         circle = generate_circle(np.random.randint(50), np.random.randint(50), np.random.randint(50*2), 50, 50)
         neg_kernel.append(circle)
-
+        
+    print(neg_kernel[1].shape, pos_kernel[1].shape)
 
     return pos_kernel, neg_kernel
 

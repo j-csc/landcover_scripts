@@ -48,23 +48,21 @@ def get_loss(mask_value):
         mask = 1 - K.cast(mask, K.floatx())
 
         loss = K.categorical_crossentropy(y_true, y_pred) * mask
-        
-        p_loss = 0
-        n_loss = 0
 
-        print(type(y_pred))
-        for p_kernel in pos_kernels:
-            temp_p_kernel = K.reshape(p_kernel, shape=(50,50))
-            temp_p_kernel = K.cast(temp_p_kernel, 'float32')
-            p_loss -= K.mean(K.conv2d(y_pred[:,:,:,2], (temp_p_kernel),strides=(1,1), padding='valid', data_format="channels_last"))
+        temp_p_kernels = (np.zeros((50,50,3,len(pos_kernels))).astype(np.float32))
+        temp_n_kernels = (np.zeros((50,50,3,len(neg_kernels))).astype(np.float32))
+
+        # Equal amount of pos and neg kernels
+        for i in range(len(pos_kernels)):
+            temp_p_kernels[:,:,2,i] = pos_kernels[i]
+            print(neg_kernels[i].shape)
+            temp_n_kernels[:,:,2,i] = neg_kernels[i]
         
-        for n_kernel in neg_kernels:
-            temp_n_kernel = K.reshape(n_kernel, shape=(50,50))
-            temp_n_kernel = K.cast(temp_n_kernel, 'float32')
-            n_loss += K.mean(K.conv2d(y_pred[:,:,:,2], (temp_n_kernel),strides=(1,1), padding='valid',data_format="channels_last"))
-        
-        p_loss = p_loss / len(pos_kernels)
-        n_loss = n_loss / len(neg_kernels)
+        p_loss = K.mean(K.conv2d(y_pred, (temp_p_kernels), padding='valid', data_format="channels_last"))
+        n_loss = K.mean(K.conv2d(y_pred, (temp_n_kernels), padding='valid',data_format="channels_last"))
+                
+        p_loss = p_loss / (temp_p_kernels.shape[-1])
+        n_loss = n_loss / (temp_n_kernels.shape[-1])
 
         return ((K.sum(loss) / K.sum(mask)) - p_loss + n_loss)
     return custom_loss_fn

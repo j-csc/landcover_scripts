@@ -11,6 +11,7 @@
 # Stdlib imports
 import sys
 import os
+import custom_loss
 
 
 # Here we look through the args to find which GPU we should use
@@ -93,6 +94,31 @@ def run_model_on_tile(model, naip_tile, inpt_size, output_size, batch_size):
 
 #---------------------------------------------------------------------------------------------------
 #---------------------------------------------------------------------------------------------------
+pos_kernels, neg_kernels = custom_loss.get_pos_neg_kernel("../notebooks/Delmarva_PL_House_Final/Delmarva_PL_House_Final.shp")
+
+def custom_loss_fn(y_true, y_pred):   
+
+    loss = K.categorical_crossentropy(y_true, y_pred)
+
+    temp_p_kernels = (np.zeros((50,50,3,len(pos_kernels))).astype(np.float32))
+    temp_n_kernels = (np.zeros((50,50,3,len(neg_kernels))).astype(np.float32))
+
+    # Equal amount of pos and neg kernels
+    for i in range(len(pos_kernels)):
+        temp_p_kernels[:,:,2,i] = pos_kernels[i]
+        print(neg_kernels[i].shape)
+        temp_n_kernels[:,:,2,i] = neg_kernels[i]
+    
+    p_loss = K.mean(K.conv2d(y_pred, (temp_p_kernels), padding='valid', data_format="channels_last"))
+    n_loss = K.mean(K.conv2d(y_pred, (temp_n_kernels), padding='valid',data_format="channels_last"))
+    
+    p_loss = p_loss / (temp_p_kernels.shape[-1])
+    n_loss = n_loss / (temp_n_kernels.shape[-1])
+
+    return ((K.sum(loss)) - p_loss + n_loss)
+
+keras.losses.custom_loss_fn = custom_loss_fn
+
 
 def do_args(arg_list, name):
     parser = argparse.ArgumentParser(description=name)
