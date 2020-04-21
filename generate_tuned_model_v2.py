@@ -58,11 +58,17 @@ def get_loss(mask_value):
             print(neg_kernels[i].shape)
             temp_n_kernels[:,:,2,i] = neg_kernels[i]
         
+        temp_p_kernels = temp_p_kernels / (np.sum(temp_p_kernels, axis=(0,1), keepdims=True) + 0.00001)
+        temp_n_kernels = temp_n_kernels / (np.sum(temp_n_kernels, axis=(0,1), keepdims=True) + 0.00001)
+
         p_loss = K.mean(K.conv2d(y_pred, (temp_p_kernels), padding='valid', data_format="channels_last"))
         n_loss = K.mean(K.conv2d(y_pred, (temp_n_kernels), padding='valid',data_format="channels_last"))
-                
+
         p_loss = p_loss / (temp_p_kernels.shape[-1])
         n_loss = n_loss / (temp_n_kernels.shape[-1])
+
+        assert np.all(temp_p_kernels[:,:,:2,:] == 0), "Must be 0"
+        assert np.all(temp_n_kernels[:,:,:2,:] == 0), "Must be 0"
 
         return ((K.sum(loss) / K.sum(mask)) - p_loss + n_loss)
     return custom_loss_fn
