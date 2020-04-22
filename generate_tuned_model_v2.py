@@ -29,17 +29,22 @@ import custom_loss
 
 pos_kernels, neg_kernels = custom_loss.get_pos_neg_kernel("../notebooks/Delmarva_PL_House_Final/Delmarva_PL_House_Final.shp")
 
-def masked_categorical_crossentropy(y_true, y_pred):
+def shape_loss():
+    temp_p_kernels = (np.zeros((50,50,3,len(pos_kernels))).astype(np.float32))
+    temp_n_kernels = (np.zeros((50,50,3,len(neg_kernels))).astype(np.float32))
+
+    # Equal amount of pos and neg kernels
+    for i in range(len(pos_kernels)):
+        temp_p_kernels[:,:,2,i] = pos_kernels[i]
+        print(neg_kernels[i].shape)
+        temp_n_kernels[:,:,2,i] = neg_kernels[i]
     
-    mask = K.all(K.equal(y_true, [1,0,0,0,0,0]), axis=-1)
-    mask = 1 - K.cast(mask, K.floatx())
+    temp_p_kernels = temp_p_kernels / (np.sum(temp_p_kernels, axis=(0,1), keepdims=True) + 0.00001)
+    temp_n_kernels = temp_n_kernels / (np.sum(temp_n_kernels, axis=(0,1), keepdims=True) + 0.00001)
 
-    loss = K.categorical_crossentropy(y_true, y_pred) * mask
-
-    return K.sum(loss) / K.sum(mask)
-
-keras.losses.masked_categorical_crossentropy = masked_categorical_crossentropy
-
+    assert np.all(temp_p_kernels[:,:,:2,:] == 0), "Other channels must be 0"
+    assert np.all(temp_n_kernels[:,:,:2,:] == 0), "Other channels must be 0"
+    return temp_p_kernels, temp_n_kernels
 
 def get_loss(mask_value):
     mask_value = K.variable(mask_value)
@@ -49,17 +54,7 @@ def get_loss(mask_value):
 
         loss = K.categorical_crossentropy(y_true, y_pred) * mask
 
-        temp_p_kernels = (np.zeros((50,50,3,len(pos_kernels))).astype(np.float32))
-        temp_n_kernels = (np.zeros((50,50,3,len(neg_kernels))).astype(np.float32))
-
-        # Equal amount of pos and neg kernels
-        for i in range(len(pos_kernels)):
-            temp_p_kernels[:,:,2,i] = pos_kernels[i]
-            print(neg_kernels[i].shape)
-            temp_n_kernels[:,:,2,i] = neg_kernels[i]
-        
-        temp_p_kernels = temp_p_kernels / (np.sum(temp_p_kernels, axis=(0,1), keepdims=True) + 0.00001)
-        temp_n_kernels = temp_n_kernels / (np.sum(temp_n_kernels, axis=(0,1), keepdims=True) + 0.00001)
+        temp_p_kernels, temp_n_kernels = shape_loss()
 
         p_loss = K.mean(K.conv2d(y_pred, (temp_p_kernels), padding='valid', data_format="channels_last"))
         n_loss = K.mean(K.conv2d(y_pred, (temp_n_kernels), padding='valid',data_format="channels_last"))
@@ -67,15 +62,16 @@ def get_loss(mask_value):
         p_loss = p_loss / (temp_p_kernels.shape[-1])
         n_loss = n_loss / (temp_n_kernels.shape[-1])
 
-        assert np.all(temp_p_kernels[:,:,:2,:] == 0), "Must be 0"
-        assert np.all(temp_n_kernels[:,:,:2,:] == 0), "Must be 0"
-
         return ((K.sum(loss) / K.sum(mask)) - p_loss + n_loss)
     return custom_loss_fn
 
 def get_model(model_path, num_classes):
     # K.clear_session()
-    tmodel = keras.models.load_model(model_path)
+    tmodel = keras.models.load_model(model_path, custom_objects={
+        "jaccard_loss":keras.metrics.mean_squared_error,
+        "loss":keras.metrics.mean_squared_error,
+        "masked_categorical_crossentropy":keras.metrics.mean_squared_error
+    })
     toutput = tmodel.layers[-2].output
     toutput = Conv2D(num_classes+1, (1,1), padding="same", use_bias=True, activation="softmax", name="output_conv")(toutput)
     model = keras.models.Model(inputs=tmodel.inputs, outputs=[toutput])
