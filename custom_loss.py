@@ -43,9 +43,12 @@ def generate_rectangle(aspect_ratio, height, width, rotation, min_pixel=100):
 
         rec = cv2.rectangle(img, (start_x, start_y), (end_x, end_y), (10,10,10), -1)
         img = rotate(image=img, angle=rotation)
+
+        area = short_side * long_side
+        percent_area = area / (height*width) 
         
         # Make sure there's no empty images (at least 100 pixels are in img)
-        if np.count_nonzero(img) < (min_pixel):
+        if np.count_nonzero(img) < (min_pixel) or percent_area < 0.1:
             # reset
             redo = True
             img = np.zeros((width, height), dtype=np.uint8)
@@ -55,7 +58,7 @@ def generate_rectangle(aspect_ratio, height, width, rotation, min_pixel=100):
     return img
 
 def generate_circle(x,y,r,height,width):
-    img = np.zeros((height, width), dtype=np.uint8)
+    img = np.zeros((width, height), dtype=np.uint8)
     circle = cv2.circle(img, (x,y), r, (10, 10, 10), -1) 
     return img
 
@@ -86,21 +89,63 @@ def get_pos_neg_kernel(shp_file):
     print("Average aspect ratio: {}".format(aspect_ratios.mean()))
 
     # Obtain positive kernel library
+    aspect_ratio_fn = lambda: np.random.normal(loc=9.07, scale=1.71)
     pos_kernel = []
-    for i in range(30):
-        rect = generate_rectangle(np.random.choice(aspect_ratios), 50, 50, np.random.randint(360))
+    for i in range(36):
+        rect = generate_rectangle(aspect_ratio_fn(), 640, 480, np.random.randint(360), 800)
         pos_kernel.append(rect)
 
     # Obtain negative kernel library
     neg_kernel = []
-    for i in range(30):
-        circle = generate_circle(np.random.randint(50), np.random.randint(50), np.random.randint(50*2), 50, 50)
+    for i in range(36):
+        circle = generate_circle(np.random.randint(640), np.random.randint(480), np.random.randint(100,480), 640, 480)
         neg_kernel.append(circle)
         
     print(neg_kernel[1].shape, pos_kernel[1].shape)
 
     return pos_kernel, neg_kernel
 
+def get_pos_neg_kernel_and_more(shp_file):
+    f = fiona.open(shp_file,"r")
+    total_num = 0
+    valid_num = 0
+
+    side_lengths = []
+    areas = []
+    for row in f:
+        if row["geometry"]["type"] == "Polygon":
+            shape = shapely.geometry.shape(row["geometry"])
+            num_points = len(row["geometry"]["coordinates"][0])
+            if num_points == 5:
+                side_lengths.append(get_side_lengths(shape))
+                areas.append(shape.area)
+                valid_num += 1
+        total_num += 1
+    f.close()
+
+    side_lengths = np.array(side_lengths)
+    short_sides = side_lengths[:,:2].mean(axis=1)
+    long_sides = side_lengths[:,2:].mean(axis=1)
+
+    # Obtain aspect ratio
+    aspect_ratios = long_sides / short_sides
+    print("Average aspect ratio: {}".format(aspect_ratios.mean()))
+
+    # Obtain positive kernel library
+    aspect_ratio_fn = lambda: np.random.normal(loc=9.07, scale=1.71)
+    pos_kernels = []
+    for i in range(36):
+        rect = generate_rectangle(aspect_ratio_fn(), 640, 480, np.random.randint(360), 800)
+        pos_kernels.append(rect)
+
+    # Obtain negative kernel library
+    neg_kernels = []
+    for pos_kernel in pos_kernels:
+        neg_kernel = 1 - pos_kernel.copy()
+        neg_kernel = neg_kernel / (neg_kernel.sum() + 0.00001)
+        neg_kernels.append(neg_kernel)
+        
+    return pos_kernels, neg_kernels, side_lengths,areas 
 
 def main():
     parser = argparse.ArgumentParser(description="Generate custom shape loss")

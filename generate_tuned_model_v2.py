@@ -216,7 +216,7 @@ def train_model_from_points(in_geo_path, in_model_path_sup, in_model_path_ae, in
 
     print("Tuning supervised model")
 
-    cpPath = f"{exp}/tmp_sup_{even}/sup_tuned_model_{even}_"
+    cpPath = f"./{exp}/tmp_sup_{even}/sup_tuned_model_{even}_"
 
     checkpointer_sup = ModelCheckpoint(filepath=(cpPath+"{epoch:02d}_{loss:.2f}.h5"), monitor='loss', verbose=1)
 
