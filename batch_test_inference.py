@@ -3,11 +3,31 @@ import glob
 import sys, os, time
 from multiprocessing import Process, Queue
 import rasterio
+
+    # gdaltindex -t_srs epsg:32618 -f GeoJSON md_test_index.geojson ./post_processed_de_tif/m_3807537_nw_18_1_20170720_inference_processed.tif
+    # ogr2ogr -clipsrc md_test_index.geojson md_test_clipped.shp ../notebooks/Delmarva_PL_House_Final/Delmarva_PL_House_Final.shp
+
  
 def do_work(work, gpu_idx):
     while not work.empty():
         fn = work.get()
         filename = (fn.split("/")[-1].split(".")[0])
+
+        # Generate index
+        test_index_fn = "./test_index_de/" + filename + "_index.geojson"
+        subprocess.call(["gdaltindex", 
+            "-t_srs", "epsg:32618",
+            "-f", "GeoJSON",
+            test_index_fn,
+            fn])
+
+        # Get raster
+        shp_out_fn = "./binary_rasters_de/" + filename + "_rasterized.shp"
+        subprocess.call(["ogr2ogr", 
+            "-clipsrc", test_index_fn,
+            shp_out_fn,
+            "../notebooks/Delmarva_PL_House_Final/Delmarva_PL_House_Final.shp"])
+
         # out_fn = f"./post_processed_md_inference/{filename}_processed.geojson"
         # subprocess.call(["python","./test_inference.py",
         #     "--input_fns", fn,
@@ -18,26 +38,26 @@ def do_work(work, gpu_idx):
         #     "--input_fn", fn,
         #     "--output_fn", out_fn,
         #     "--gpu", str(gpu_idx)])s
-        p_fn = f"./post_processed_de_inference/{filename}_processed.geojson"
-        out_fn = f"./post_processed_de_tif/{filename}_processed.tif"
-        f = rasterio.open(fn,"r")
-        left, bottom, right, top = f.bounds
-        crs = f.crs.to_string()
-        height, width = f.height, f.width
-        f.close()
-        command = [
-            "gdal_rasterize",
-            "-ot", "Byte",
-            "-burn", "1.0",
-            "-of", "GTiff",
-            "-te", str(left), str(bottom), str(right), str(top),
-            "-ts", str(width), str(height),
-            "-co", "COMPRESS=LZW",
-            "-co", "BIGTIFF=YES",
-            p_fn,
-            out_fn
-        ]
-        subprocess.call(command)
+        # p_fn = f"./post_processed_de_inference/{filename}_processed.geojson"
+        # out_fn = f"./post_processed_de_tif/{filename}_processed.tif"
+        # f = rasterio.open(fn,"r")
+        # left, bottom, right, top = f.bounds
+        # crs = f.crs.to_string()
+        # height, width = f.height, f.width
+        # f.close()
+        # command = [
+        #     "gdal_rasterize",
+        #     "-ot", "Byte",
+        #     "-burn", "1.0",
+        #     "-of", "GTiff",
+        #     "-te", str(left), str(bottom), str(right), str(top),
+        #     "-ts", str(width), str(height),
+        #     "-co", "COMPRESS=LZW",
+        #     "-co", "BIGTIFF=YES",
+        #     p_fn,
+        #     out_fn
+        # ]
+        # subprocess.call(command)
         
     return True
 
@@ -69,6 +89,8 @@ def main():
     batch_run(fn_folders)
 
     # Rasterize
+    # gdaltindex -t_srs epsg:32618 -f GeoJSON md_test_index.geojson ./post_processed_de_tif/m_3807537_nw_18_1_20170720_inference_processed.tif
+    # ogr2ogr -clipsrc md_test_index.geojson md_test_clipped.shp ../notebooks/Delmarva_PL_House_Final/Delmarva_PL_House_Final.shp
 
 
     # Small batch inference

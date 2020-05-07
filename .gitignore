@@ -8,3 +8,6 @@ m_*
 post_processed*
 temp_123/
 all_test_*/
+binary_rasters_*/
+test_index_*/
+super_*
