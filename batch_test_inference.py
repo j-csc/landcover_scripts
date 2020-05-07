@@ -14,19 +14,19 @@ def do_work(work, gpu_idx):
         filename = (fn.split("/")[-1].split(".")[0])
 
         # Generate index
-        test_index_fn = "./test_index_de/" + filename + "_index.geojson"
-        subprocess.call(["gdaltindex", 
-            "-t_srs", "epsg:32618",
-            "-f", "GeoJSON",
-            test_index_fn,
-            fn])
+        # test_index_fn = "./test_index_de/" + filename + "_index.geojson"
+        # subprocess.call(["gdaltindex", 
+        #     "-t_srs", "epsg:32618",
+        #     "-f", "GeoJSON",
+        #     test_index_fn,
+        #     fn])
 
-        # Get raster
-        shp_out_fn = "./binary_rasters_de/" + filename + "_rasterized.shp"
-        subprocess.call(["ogr2ogr", 
-            "-clipsrc", test_index_fn,
-            shp_out_fn,
-            "../notebooks/Delmarva_PL_House_Final/Delmarva_PL_House_Final.shp"])
+        # # Get raster
+        # shp_out_fn = "./binary_raster_de/" + filename + "_rasterized.geojson"
+        # subprocess.call(["ogr2ogr", 
+        #     "-clipsrc", test_index_fn,
+        #     shp_out_fn,
+        #     "../notebooks/Delmarva_PL_House_Final/Delmarva_PL_House_Final.shp"])
 
         # out_fn = f"./post_processed_md_inference/{filename}_processed.geojson"
         # subprocess.call(["python","./test_inference.py",
@@ -37,27 +37,28 @@ def do_work(work, gpu_idx):
         # subprocess.call(["python","./post_processing.py",
         #     "--input_fn", fn,
         #     "--output_fn", out_fn,
-        #     "--gpu", str(gpu_idx)])s
-        # p_fn = f"./post_processed_de_inference/{filename}_processed.geojson"
-        # out_fn = f"./post_processed_de_tif/{filename}_processed.tif"
-        # f = rasterio.open(fn,"r")
-        # left, bottom, right, top = f.bounds
-        # crs = f.crs.to_string()
-        # height, width = f.height, f.width
-        # f.close()
-        # command = [
-        #     "gdal_rasterize",
-        #     "-ot", "Byte",
-        #     "-burn", "1.0",
-        #     "-of", "GTiff",
-        #     "-te", str(left), str(bottom), str(right), str(top),
-        #     "-ts", str(width), str(height),
-        #     "-co", "COMPRESS=LZW",
-        #     "-co", "BIGTIFF=YES",
-        #     p_fn,
-        #     out_fn
-        # ]
-        # subprocess.call(command)
+        #     "--gpu", str(gpu_idx)])
+
+        p_fn = f"./binary_raster_de/{filename}_rasterized.geojson"
+        out_fn = f"./binary_raster_de_tif/{filename}_rasterized.tif"
+        f = rasterio.open(fn,"r")
+        left, bottom, right, top = f.bounds
+        crs = f.crs.to_string()
+        height, width = f.height, f.width
+        f.close()
+        command = [
+            "gdal_rasterize",
+            "-ot", "Byte",
+            "-burn", "1.0",
+            "-of", "GTiff",
+            "-te", str(left), str(bottom), str(right), str(top),
+            "-ts", str(width), str(height),
+            "-co", "COMPRESS=LZW",
+            "-co", "BIGTIFF=YES",
+            p_fn,
+            out_fn
+        ]
+        subprocess.call(command)
         
     return True
 
@@ -85,6 +86,7 @@ def main():
     # batch_run(all_fns)
 
     # Batch run post-processing
+    # fn_folders = glob.glob("./binary_raster_md/*")
     fn_folders = glob.glob("./all_test_inference_de/*")
     batch_run(fn_folders)
 
