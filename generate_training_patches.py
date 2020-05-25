@@ -36,7 +36,7 @@ def gen_training_patches(x_fns, y_fns, width, height, channel, target, batch_siz
         f = rasterio.open(y_fn, "r")
         target = f.read().squeeze()
         f.close()
-        print(target.shape)
+        # print(target.shape)
 
         # Randomly sample 100 240x240 patch per file
         for i in range(1):
