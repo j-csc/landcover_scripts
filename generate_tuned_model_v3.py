@@ -20,7 +20,7 @@ import keras.utils
 from keras.optimizers import SGD, Adam, RMSprop, Adadelta
 from keras.layers import Input, Dense, Activation, MaxPooling2D, Conv2D, BatchNormalization
 from keras.layers import Concatenate, Cropping2D, Lambda
-from keras.losses import categorical_crossentropy
+from keras.losses import categorical_crossentropy, binary_crossentropy
 from keras.preprocessing.image import ImageDataGenerator
 from keras.callbacks import ModelCheckpoint
 import pandas as pd
@@ -43,15 +43,15 @@ keras.losses.masked_categorical_crossentropy = masked_categorical_crossentropy
 
 def get_loss(mask_value):
     mask_value = K.variable(mask_value)
-    def masked_categorical_crossentropy(y_true, y_pred):
+    def masked_binary_crossentropy(y_true, y_pred):
         
         mask = K.all(K.equal(y_true, mask_value), axis=-1)
         mask = 1 - K.cast(mask, K.floatx())
 
-        loss = K.categorical_crossentropy(y_true, y_pred) * mask
+        loss = K.binary_crossentropy(y_true, y_pred) * mask
 
         return K.sum(loss) / K.sum(mask)
-    return masked_categorical_crossentropy
+    return masked_binary_crossentropy
 
 def get_model(model_path, num_classes):
     # K.clear_session()
@@ -68,7 +68,7 @@ def get_model(model_path, num_classes):
     loss_mask = np.zeros(num_classes+1)
     loss_mask[0] = 1
 
-    model.compile(loss=get_loss(loss_mask), optimizer=optimizer)
+    model.compile(loss=K.binary_crossentropy, optimizer=optimizer)
     
     return model
 
@@ -81,7 +81,7 @@ def train_model_from_points(in_geo_path, in_model_path_sup, in_model_path_ae, in
     # Load in sample
     print("Loading tiles...")
     x_train, y_train = generate_training_patches.gen_training_patches("../../../media/disk2/datasets/maaryland_naip_2017/",
-     "./binary_raster_md_tif/", 240, 240, 4, 50000)
+     "./binary_raster_md_tif/", 240, 240, 4, 2, 50000)
 
     print(x_train.shape)
     print(y_train.shape)

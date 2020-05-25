@@ -4,16 +4,18 @@ import fiona
 import numpy as np
 import keras.utils
 
-def gen_training_patches(x_fns, y_fns, width, height, channel, batch_size):
+def gen_training_patches(x_fns, y_fns, width, height, channel, target, batch_size):
+    # Output
     x_batches = np.zeros((batch_size, width, height, channel), dtype=np.float32)
-    y_batches = np.zeros((batch_size, width, height), dtype=np.float32)
+    y_batches = np.zeros((batch_size, width, height, target), dtype=np.float32)
+
+    y_batches[:,:,:] = [1] + [0] * (y_batches.shape[-1]-1)
 
     print(x_batches.shape, y_batches.shape)
 
     ground_truth_set = glob.glob(y_fns + "*")
 
     count = 0
-
     non_zero_count = 0
 
     while count < batch_size:
@@ -37,34 +39,41 @@ def gen_training_patches(x_fns, y_fns, width, height, channel, batch_size):
         print(target.shape)
 
         # Randomly sample 100 240x240 patch per file
-        for i in range(100):
+        for i in range(1):
             if count != batch_size:
                 x = np.random.randint(0, data.shape[1]-width)
                 y = np.random.randint(0, data.shape[0]-height)
                 while np.any((data[y:y+height, x:x+width, :] == 0).sum(axis=2) == data.shape[2]):
                     x = np.random.randint(0, data.shape[1]-width)
                     y = np.random.randint(0, data.shape[0]-height)
-                    
+                
+                # Set up x_batch with img data at y,x coords
                 img = data[y:y+height, x:x+width, :].astype(np.float32)
-                temp_target = target[y:y+height, x:x+width].copy()
+                x_batches[count] = img
+                
+                # Set up target labels with 4 dim
+                temp_target = target[y:y+height, x:x+width]
+                
+                for j in range(0, height):
+                    for k in range(0, width):
+                        label = target[j,k]
+                        y_batches[count,j,k,0] = 0
+                        y_batches[count,j,k,label] = 1
+
+                # print(np.unique(temp_target, return_counts=True))
 
                 if (np.count_nonzero(temp_target) != 0):
                     non_zero_count += 1
-
-                x_batches[count] = img
-                y_batches[count] = temp_target
-                # print(np.count_nonzero(y_batches[count]))
+                
                 count += 1
 
                 if count % 1000 == 0:
                     print(f"Iteration: {count}")
-        del data, target
 
     x_batches = x_batches/255.0
-    y_batches = keras.utils.to_categorical(y_batches, num_classes=2)
+    # y_batches = keras.utils.to_categorical(y_batches, num_classes=2)
 
-    # np.save("./x_train.npy",x_batches)
-    # np.save("./y_train.npy",y_batches)
+    print(y_batches.shape)
 
     print(non_zero_count / count)
 
@@ -73,7 +82,7 @@ def gen_training_patches(x_fns, y_fns, width, height, channel, batch_size):
 def main():
     # Sample 50k patches of 240x240 images
     gen_training_patches("../../../media/disk2/datasets/maaryland_naip_2017/",
-     "./binary_raster_md_tif/", 240, 240, 4, 50000)
+     "./binary_raster_md_tif/", 240, 240, 4, 2, 2)
     
     pass
 
