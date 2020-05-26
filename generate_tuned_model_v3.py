@@ -28,6 +28,8 @@ from scipy.signal import convolve2d
 import custom_loss
 import generate_training_patches
 
+print(K.tensorflow_backend._get_available_gpus())
+
 # Sample: python generate_tuned_model_v3.py --in_geo_path ./binary_raster_md/ --in_tile_path ./binary_raster_md_tif/ --in_model_path_sup ../landcover-old/web_tool/data/naip_demo_model.h5 --in_model_path_ae ../landcover-old/web_tool/data/naip_autoencoder.h5 --out_model_path_sup ./naip_demo_tuned.h5 --out_model_path_ae ./naip_autoencoder_tuned.h5 --num_classes 2 --gpu 1 --exp 1 --even even
 
 def masked_categorical_crossentropy(y_true, y_pred):
@@ -74,17 +76,17 @@ def get_model(model_path, num_classes):
 
 def train_model_from_points(in_geo_path, in_model_path_sup, in_model_path_ae, in_tile_path, out_model_path_sup, out_model_path_ae, num_classes, exp, even):
     # Train supervised
-    print("Loading initial models...")
-    model_sup = get_model(in_model_path_sup, num_classes)
-    model_sup.summary()
+    # print("Loading initial models...")
+    # model_sup = get_model(in_model_path_sup, num_classes)
+    # model_sup.summary()
 
-    # Load in sample
-    print("Loading tiles...")
-    x_train, y_train = generate_training_patches.gen_training_patches("../../../media/disk2/datasets/maaryland_naip_2017/",
-     "./binary_raster_md_tif/", 240, 240, 4, 2, 50000)
+    # # Load in sample
+    # print("Loading tiles...")
+    # x_train, y_train = generate_training_patches.gen_training_patches("../../../media/disk2/datasets/maaryland_naip_2017/",
+    #  "./binary_raster_md_tif/", 240, 240, 4, 2, 50000)
 
-    print(x_train.shape)
-    print(y_train.shape)
+    # print(x_train.shape)
+    # print(y_train.shape)
 
     # y_train_ae[:,:,:] = [1] + [0] * (y_train_ae.shape[-1]-1)
     # y_train[:,:,:] = [1] + [0] * (y_train.shape[-1]-1)
@@ -94,38 +96,46 @@ def train_model_from_points(in_geo_path, in_model_path_sup, in_model_path_ae, in
 
     # Supervised tuning
 
-    print("Tuning supervised model")
+    # print("Tuning supervised model")
 
-    cpPath = f"./{exp}/tmp_sup_{even}/sup_tuned_model_{even}_"
+    # cpPath = f"./{exp}/tmp_sup_{even}/sup_tuned_model_{even}_"
 
-    checkpointer_sup = ModelCheckpoint(filepath=(cpPath+"{epoch:02d}_{loss:.2f}.h5"), monitor='loss', verbose=1)
+    # checkpointer_sup = ModelCheckpoint(filepath=(cpPath+"{epoch:02d}_{loss:.2f}.h5"), monitor='loss', verbose=1)
 
-    model_sup.fit(
-        x_train, y_train,
-        batch_size=10, epochs=10, verbose=1, validation_split=0,
-        callbacks=[checkpointer_sup]
-    )
-
-    model_sup.save(out_model_path_sup)
-
-    # # Unsupervised tuning
-
-    # print("Tuning Unsupervised model")
-
-    # model_ae = get_model(in_model_path_ae, num_classes)
-    # model_ae.summary()
-
-    # cpPath = f"{exp}/tmp_ae_{even}/ae_tuned_model_{even}_"
-
-    # checkpointer_ae = ModelCheckpoint(filepath=(cpPath+"{epoch:02d}_{loss:.2f}.h5"), monitor='loss', verbose=1)
-
-    # model_ae.fit(
-    #     x_train_ae, y_train_ae,
+    # model_sup.fit(
+    #     x_train, y_train,
     #     batch_size=10, epochs=10, verbose=1, validation_split=0,
-    #     callbacks=[checkpointer_ae]
+    #     callbacks=[checkpointer_sup]
     # )
 
-    # model_ae.save(out_model_path_ae)
+    # model_sup.save(out_model_path_sup)
+
+    # Unsupervised tuning
+
+    print("Tuning Unsupervised model")
+
+    model_ae = get_model(in_model_path_ae, num_classes)
+    model_ae.summary()
+
+    # Load in sample
+    print("Loading tiles...")
+    x_train_ae, y_train_ae = generate_training_patches.gen_training_patches("../../../media/disk2/datasets/maaryland_naip_2017/",
+     "./binary_raster_md_tif/", 150, 150, 4, 2, 50000)
+
+    print(x_train_ae.shape)
+    print(y_train_ae.shape)
+
+    cpPath = f"{exp}/tmp_ae_{even}/ae_tuned_model_{even}_"
+
+    checkpointer_ae = ModelCheckpoint(filepath=(cpPath+"{epoch:02d}_{loss:.2f}.h5"), monitor='loss', verbose=1)
+
+    model_ae.fit(
+        x_train_ae, y_train_ae,
+        batch_size=10, epochs=10, verbose=1, validation_split=0,
+        callbacks=[checkpointer_ae]
+    )
+
+    model_ae.save(out_model_path_ae)
 
 def main():
     parser = argparse.ArgumentParser(description="Generate a model tuned using webtool")

@@ -7,7 +7,7 @@ import keras.utils
 def gen_training_patches(x_fns, y_fns, width, height, channel, target, batch_size):
     # Output
     x_batches = np.zeros((batch_size, width, height, channel), dtype=np.float32)
-    y_batches = np.zeros((batch_size, width, height, target), dtype=np.float32)
+    y_batches = np.zeros((batch_size, width, height, target+1), dtype=np.float32)
 
     y_batches[:,:,:] = [1] + [0] * (y_batches.shape[-1]-1)
 
@@ -39,7 +39,7 @@ def gen_training_patches(x_fns, y_fns, width, height, channel, target, batch_siz
         # print(target.shape)
 
         # Randomly sample 100 240x240 patch per file
-        for i in range(1):
+        for i in range(100):
             if count != batch_size:
                 x = np.random.randint(0, data.shape[1]-width)
                 y = np.random.randint(0, data.shape[0]-height)
@@ -58,7 +58,7 @@ def gen_training_patches(x_fns, y_fns, width, height, channel, target, batch_siz
                     for k in range(0, width):
                         label = target[j,k]
                         y_batches[count,j,k,0] = 0
-                        y_batches[count,j,k,label] = 1
+                        y_batches[count,j,k,label+1] = 1
 
                 # print(np.unique(temp_target, return_counts=True))
 
@@ -67,7 +67,7 @@ def gen_training_patches(x_fns, y_fns, width, height, channel, target, batch_siz
                 
                 count += 1
 
-                if count % 1000 == 0:
+                if count % 100 == 0:
                     print(f"Iteration: {count}")
 
     x_batches = x_batches/255.0
