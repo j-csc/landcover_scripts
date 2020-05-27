@@ -13,10 +13,34 @@ import rasterio
 import fiona
 import fiona.transform
 
+# Here we look through the args to find which GPU we should use
+# We must do this before importing keras, which is super hacky
+# See: https://stackoverflow.com/questions/40690598/can-keras-with-tensorflow-backend-be-forced-to-use-cpu-or-gpu-at-will
+# TODO: This _really_ should be part of the normal argparse code.
+def parse_args(args, key):
+    def is_int(s):
+        try: 
+            int(s)
+            return True
+        except ValueError:
+            return False
+    for i, arg in enumerate(args):
+        if arg == key:
+            if i+1 < len(sys.argv):
+                if is_int(args[i+1]):
+                    return args[i+1]
+    return None
+os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
+GPU_ID = parse_args(sys.argv, "--gpu")
+if GPU_ID is not None: # if we passed `--gpu INT`, then set the flag, else don't
+    os.environ["CUDA_VISIBLE_DEVICES"] = GPU_ID
+
+
 import keras
 import keras.backend as K
 import keras.callbacks
 import keras.utils
+import tensorflow as tf
 from keras.optimizers import SGD, Adam, RMSprop, Adadelta
 from keras.layers import Input, Dense, Activation, MaxPooling2D, Conv2D, BatchNormalization
 from keras.layers import Concatenate, Cropping2D, Lambda
@@ -28,8 +52,21 @@ from scipy.signal import convolve2d
 import custom_loss
 import generate_training_patches
 
-print(K.tensorflow_backend._get_available_gpus())
 
+def _get_available_gpus():
+    """Get a list of available gpu devices (formatted as strings).
+
+    # Returns
+        A list of available GPU devices.
+    """
+    #global _LOCAL_DEVICES
+    if K.tensorflow_backend._LOCAL_DEVICES is None:
+        devices = tf.config.list_logical_devices()
+        K.tensorflow_backend._LOCAL_DEVICES = [x.name for x in devices]
+    return [x for x in K.tensorflow_backend._LOCAL_DEVICES if 'device:gpu' in x.lower()]
+
+K.tensorflow_backend._get_available_gpus = _get_available_gpus
+print(K.tensorflow_backend._get_available_gpus())
 # Sample: python generate_tuned_model_v3.py --in_geo_path ./binary_raster_md/ --in_tile_path ./binary_raster_md_tif/ --in_model_path_sup ../landcover-old/web_tool/data/naip_demo_model.h5 --in_model_path_ae ../landcover-old/web_tool/data/naip_autoencoder.h5 --out_model_path_sup ./naip_demo_tuned.h5 --out_model_path_ae ./naip_autoencoder_tuned.h5 --num_classes 2 --gpu 1 --exp 1 --even even
 
 def masked_categorical_crossentropy(y_true, y_pred):

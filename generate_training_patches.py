@@ -67,7 +67,7 @@ def gen_training_patches(x_fns, y_fns, width, height, channel, target, batch_siz
                 
                 count += 1
 
-                if count % 100 == 0:
+                if count % 1000 == 0:
                     print(f"Iteration: {count}")
 
     x_batches = x_batches/255.0

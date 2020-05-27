@@ -3,17 +3,16 @@ import glob
 import sys, os, time
 from multiprocessing import Process, Queue
 import rasterio
-
-    # gdaltindex -t_srs epsg:32618 -f GeoJSON md_test_index.geojson ./post_processed_de_tif/m_3807537_nw_18_1_20170720_inference_processed.tif
-    # ogr2ogr -clipsrc md_test_index.geojson md_test_clipped.shp ../notebooks/Delmarva_PL_House_Final/Delmarva_PL_House_Final.shp
-
  
 def do_work(work, gpu_idx):
     while not work.empty():
         fn = work.get()
         filename = (fn.split("/")[-1].split(".")[0])
 
+        #################
         # Generate index
+        #################
+
         # test_index_fn = "./test_index_de/" + filename + "_index.geojson"
         # subprocess.call(["gdaltindex", 
         #     "-t_srs", "epsg:32618",
@@ -21,12 +20,21 @@ def do_work(work, gpu_idx):
         #     test_index_fn,
         #     fn])
 
-        # # Get raster
+
+        #################
+        # Get raster md
+        #################
+
         # shp_out_fn = "./binary_raster_de/" + filename + "_rasterized.geojson"
         # subprocess.call(["ogr2ogr", 
         #     "-clipsrc", test_index_fn,
         #     shp_out_fn,
         #     "../notebooks/Delmarva_PL_House_Final/Delmarva_PL_House_Final.shp"])
+
+
+        #################
+        # Test Inference
+        #################
 
         # out_fn = f"./post_processed_md_inference/{filename}_processed.geojson"
         # subprocess.call(["python","./test_inference.py",
@@ -39,26 +47,30 @@ def do_work(work, gpu_idx):
         #     "--output_fn", out_fn,
         #     "--gpu", str(gpu_idx)])
 
-        p_fn = f"./binary_raster_de/{filename}_rasterized.geojson"
-        out_fn = f"./binary_raster_de_tif/{filename}_rasterized.tif"
-        f = rasterio.open(fn,"r")
-        left, bottom, right, top = f.bounds
-        crs = f.crs.to_string()
-        height, width = f.height, f.width
-        f.close()
-        command = [
-            "gdal_rasterize",
-            "-ot", "Byte",
-            "-burn", "1.0",
-            "-of", "GTiff",
-            "-te", str(left), str(bottom), str(right), str(top),
-            "-ts", str(width), str(height),
-            "-co", "COMPRESS=LZW",
-            "-co", "BIGTIFF=YES",
-            p_fn,
-            out_fn
-        ]
-        subprocess.call(command)
+        #################
+        # Get raster de
+        #################
+
+        # p_fn = f"./binary_raster_de/{filename}_rasterized.geojson"
+        # out_fn = f"./binary_raster_de_tif/{filename}_rasterized.tif"
+        # f = rasterio.open(fn,"r")
+        # left, bottom, right, top = f.bounds
+        # crs = f.crs.to_string()
+        # height, width = f.height, f.width
+        # f.close()
+        # command = [
+        #     "gdal_rasterize",
+        #     "-ot", "Byte",
+        #     "-burn", "1.0",
+        #     "-of", "GTiff",
+        #     "-te", str(left), str(bottom), str(right), str(top),
+        #     "-ts", str(width), str(height),
+        #     "-co", "COMPRESS=LZW",
+        #     "-co", "BIGTIFF=YES",
+        #     p_fn,
+        #     out_fn
+        # ]
+        # subprocess.call(command)
         
     return True
 
@@ -77,23 +89,23 @@ def batch_run(ALL_FNS):
 
 def main():
     # Batch run inference
-    # fn_folders = glob.glob("../../../media/disk1/datasets/delaware_data/de_100cm_2017/*")
-    # all_fns = []
-    # for fn_folder in fn_folders:
-    #     fns = (glob.glob(fn_folder + "/*.tif"))
-    #     for fn in fns:
-    #         all_fns.append(fn)
-    # batch_run(all_fns)
+    # fn_folders = glob.glob("../../../media/disk1/datasets/delaware_data/de_100cm_2017/*") # Delaware
+    fn_folders = glob.glob("../../../media/disk2/datasets/maaryland_naip_2017/*") # MD
+    all_fns = []
+    for fn_folder in fn_folders:
+        fns = (glob.glob(fn_folder + "/*.mrf"))
+        for fn in fns:
+            all_fns.append(fn)
+    batch_run(all_fns)
 
     # Batch run post-processing
     # fn_folders = glob.glob("./binary_raster_md/*")
-    fn_folders = glob.glob("./all_test_inference_de/*")
-    batch_run(fn_folders)
+    # fn_folders = glob.glob("./all_test_inference_de/*")
+    # batch_run(fn_folders)
 
     # Rasterize
     # gdaltindex -t_srs epsg:32618 -f GeoJSON md_test_index.geojson ./post_processed_de_tif/m_3807537_nw_18_1_20170720_inference_processed.tif
     # ogr2ogr -clipsrc md_test_index.geojson md_test_clipped.shp ../notebooks/Delmarva_PL_House_Final/Delmarva_PL_House_Final.shp
-
 
     # Small batch inference
     # exps = (glob.glob("./temp_123/tmp_*"))
@@ -112,7 +124,6 @@ def main():
     #             "--output_fns", "./m_3807536_se_18_1_20170611_ae_even_best.tif",
     #             "--model", "./new/experiment10/tmp_ae_even/ae_tuned_model_even_08_0.17.h5",
     #             "--gpu", "1"])
-
     # subprocess.call(["python","./test_inference.py",
     #             "--input_fns", "../../../media/disk2/datasets/maaryland_naip_2017/38075/m_3807536_se_18_1_20170611.mrf",
     #             "--output_fns", "./m_3807536_se_18_1_20170611_ae_uneven_best.tif",
