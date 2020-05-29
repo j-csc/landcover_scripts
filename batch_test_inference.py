@@ -90,13 +90,13 @@ def batch_run(ALL_FNS):
 def main():
     # Batch run inference
     # fn_folders = glob.glob("../../../media/disk1/datasets/delaware_data/de_100cm_2017/*") # Delaware
-    fn_folders = glob.glob("../../../media/disk2/datasets/maaryland_naip_2017/*") # MD
-    all_fns = []
-    for fn_folder in fn_folders:
-        fns = (glob.glob(fn_folder + "/*.mrf"))
-        for fn in fns:
-            all_fns.append(fn)
-    batch_run(all_fns)
+    # fn_folders = glob.glob("../../../media/disk2/datasets/maaryland_naip_2017/*") # MD
+    # all_fns = []
+    # for fn_folder in fn_folders:
+    #     fns = (glob.glob(fn_folder + "/*.mrf"))
+    #     for fn in fns:
+    #         all_fns.append(fn)
+    # batch_run(all_fns)
 
     # Batch run post-processing
     # fn_folders = glob.glob("./binary_raster_md/*")
@@ -108,12 +108,16 @@ def main():
     # ogr2ogr -clipsrc md_test_index.geojson md_test_clipped.shp ../notebooks/Delmarva_PL_House_Final/Delmarva_PL_House_Final.shp
 
     # Small batch inference
-    # exps = (glob.glob("./temp_123/tmp_*"))
-    # subprocess.call(["python","./test_inference.py",
-    #             "--input_fns", "../landcover-old/web_tool/tiles/m_3807537_ne_18_1_20170611.mrf",
-    #             "--output_fns", "./m_3807537_ne_18_1_20170611_sup_even_best.tif",
-    #             "--model", "./new/experiment9/tmp_sup_even/sup_tuned_model_even_09_0.11.h5",
-    #             "--gpu", "1"])
+    exps = (glob.glob("./test_run_1/tmp_ae_even/*"))
+    count = 0
+    for e in exps:
+        count += 1
+        print(e)
+        subprocess.call(["python","./test_inference.py",
+                    "--input_fns", "../landcover-old/web_tool/tiles/m_3807537_ne_18_1_20170611.mrf",
+                    "--output_fns", f"./3807537_{count}.tif",
+                    "--model", e,
+                    "--gpu", "1"])
     # subprocess.call(["python","./test_inference.py",
     #             "--input_fns", "../../../media/disk2/datasets/maaryland_naip_2017/38075/m_3807536_se_18_1_20170611.mrf",
     #             "--output_fns", "./m_3807536_se_18_1_20170611_sup_uneven_best.tif",

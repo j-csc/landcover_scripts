@@ -34,6 +34,11 @@ os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 GPU_ID = parse_args(sys.argv, "--gpu")
 if GPU_ID is not None: # if we passed `--gpu INT`, then set the flag, else don't
     os.environ["CUDA_VISIBLE_DEVICES"] = GPU_ID
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+
+import tensorflow as tf
+print(tf.__version__)
+print("Num GPUs Available: ", len(tf.config.experimental.list_physical_devices('GPU')))
 
 
 import keras
@@ -157,7 +162,7 @@ def train_model_from_points(in_geo_path, in_model_path_sup, in_model_path_ae, in
     # Load in sample
     print("Loading tiles...")
     x_train_ae, y_train_ae = generate_training_patches.gen_training_patches("../../../media/disk2/datasets/maaryland_naip_2017/",
-     "./binary_raster_md_tif/", 150, 150, 4, 2, 50000)
+     "./binary_raster_md_tif/", 150, 150, 4, 2, 25000)
 
     print(x_train_ae.shape)
     print(y_train_ae.shape)

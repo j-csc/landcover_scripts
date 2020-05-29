@@ -4,7 +4,7 @@ import fiona
 import numpy as np
 import keras.utils
 
-def gen_training_patches(x_fns, y_fns, width, height, channel, target, batch_size):
+def gen_training_patches(x_fns, y_fns, width, height, channel, target, batch_size, loc='south'):
     # Output
     x_batches = np.zeros((batch_size, width, height, channel), dtype=np.float32)
     y_batches = np.zeros((batch_size, width, height, target+1), dtype=np.float32)
@@ -17,6 +17,12 @@ def gen_training_patches(x_fns, y_fns, width, height, channel, target, batch_siz
 
     count = 0
     non_zero_count = 0
+
+    # Optional, for south, north maryland check
+    if loc == 'south':
+        ground_truth_set = [i for i in ground_truth_set if '38075' in i or '38076' in i or '38077' in i]
+    else:
+        ground_truth_set = [i for i in ground_truth_set if '39075' in i or '39076' in i or '39077' in i]
 
     while count < batch_size:
         # Randomly choose a file from input list
@@ -38,14 +44,27 @@ def gen_training_patches(x_fns, y_fns, width, height, channel, target, batch_siz
         f.close()
         # print(target.shape)
 
+        # Poultry pixels
+        y_ind,x_ind = np.where(target==1)
+
         # Randomly sample 100 240x240 patch per file
         for i in range(100):
             if count != batch_size:
                 x = np.random.randint(0, data.shape[1]-width)
                 y = np.random.randint(0, data.shape[0]-height)
-                while np.any((data[y:y+height, x:x+width, :] == 0).sum(axis=2) == data.shape[2]):
-                    x = np.random.randint(0, data.shape[1]-width)
-                    y = np.random.randint(0, data.shape[0]-height)
+
+                if (len(np.unique(target)) == 2) and (len(np.unique((target[y:y+height, x:x+width]))) != 2):
+                    rand_index = np.random.randint(0,len(x_ind))
+                    x = x_ind[rand_index]
+                    y = y_ind[rand_index]
+                    while not (x >= 0 and x < data.shape[1]-width and y >= 0 and y < data.shape[0]-height):
+                        rand_index = np.random.randint(0,len(x_ind))
+                        x = x_ind[rand_index]
+                        y = y_ind[rand_index]
+
+                # while (np.any((data[y:y+height, x:x+width, :] == 0).sum(axis=2) == data.shape[2])):
+                #     x = np.random.randint(0, data.shape[1]-width)
+                #     y = np.random.randint(0, data.shape[0]-height)
                 
                 # Set up x_batch with img data at y,x coords
                 img = data[y:y+height, x:x+width, :].astype(np.float32)
@@ -67,7 +86,7 @@ def gen_training_patches(x_fns, y_fns, width, height, channel, target, batch_siz
                 
                 count += 1
 
-                if count % 1000 == 0:
+                if count % 10 == 0:
                     print(f"Iteration: {count}")
 
     x_batches = x_batches/255.0
@@ -81,8 +100,11 @@ def gen_training_patches(x_fns, y_fns, width, height, channel, target, batch_siz
 
 def main():
     # Sample 50k patches of 240x240 images
-    gen_training_patches("../../../media/disk2/datasets/maaryland_naip_2017/",
-     "./binary_raster_md_tif/", 240, 240, 4, 2, 2)
+    
+    x,y = gen_training_patches("../../../media/disk2/datasets/maaryland_naip_2017/",
+     "./binary_raster_md_tif/", 240, 240, 4, 2, 1000)
+
+    # print(y)
     
     pass
 
