@@ -57,10 +57,15 @@ def gen_training_patches(x_fns, y_fns, width, height, channel, target, batch_siz
                     rand_index = np.random.randint(0,len(x_ind))
                     x = x_ind[rand_index]
                     y = y_ind[rand_index]
+                    temp_count = 0
                     while not (x >= 0 and x < data.shape[1]-width and y >= 0 and y < data.shape[0]-height):
+                        if (temp_count > 10):
+                            x = np.random.randint(0, data.shape[1]-width)
+                            y = np.random.randint(0, data.shape[0]-height)
                         rand_index = np.random.randint(0,len(x_ind))
                         x = x_ind[rand_index]
                         y = y_ind[rand_index]
+                        temp_count += 1
 
                 # while (np.any((data[y:y+height, x:x+width, :] == 0).sum(axis=2) == data.shape[2])):
                 #     x = np.random.randint(0, data.shape[1]-width)

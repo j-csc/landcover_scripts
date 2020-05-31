@@ -169,11 +169,11 @@ def main():
         #----------------------------------------------------------------
         
         if save_probabilities:
-            t_output_fn = output_fn[:-4] + "_prob.tif"
+            t_output_fn = "test_prob.tif"
             current_profile = curr_profile.copy()
             current_profile['driver'] = 'GTiff'
             current_profile['dtype'] = 'uint8'
-            current_profile['count'] = 5 # TODO: This assumes that there are 5 outputs, fix this
+            current_profile['count'] = 3 # TODO: This assumes that there are 5 outputs, fix this
             current_profile['compress'] = "lzw"
 
             # quantize the probabilities
@@ -185,8 +185,7 @@ def main():
             f.write(output[:,:,0], 1) # TODO: This assumes that there are 5 outputs, fix this
             f.write(output[:,:,1], 2) # TODO: This assumes that there are 5 outputs, fix this
             f.write(output[:,:,2], 3) # TODO: This assumes that there are 5 outputs, fix this
-            f.write(output[:,:,3], 4) # TODO: This assumes that there are 5 outputs, fix this
-            f.write(output[:,:,4], 5) # TODO: This assumes that there are 5 outputs, fix this
+
             f.close()
 
         #----------------------------------------------------------------
