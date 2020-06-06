@@ -87,15 +87,15 @@ keras.losses.masked_categorical_crossentropy = masked_categorical_crossentropy
 
 def get_loss(mask_value):
     mask_value = K.variable(mask_value)
-    def masked_binary_crossentropy(y_true, y_pred):
+    def masked_categorical_crossentropy(y_true, y_pred):
         
         mask = K.all(K.equal(y_true, mask_value), axis=-1)
         mask = 1 - K.cast(mask, K.floatx())
 
-        loss = K.binary_crossentropy(y_true, y_pred) * mask
+        loss = K.categorical_crossentropy(y_true, y_pred) * mask
 
         return K.sum(loss) / K.sum(mask)
-    return masked_binary_crossentropy
+    return masked_categorical_crossentropy
 
 def get_model(model_path, num_classes):
     # K.clear_session()
@@ -161,8 +161,8 @@ def train_model_from_points(in_geo_path, in_model_path_sup, in_model_path_ae, in
 
     # Load in sample
     print("Loading tiles...")
-    x_train_ae, y_train_ae = generate_training_patches.gen_training_patches("../../../media/disk2/datasets/maaryland_naip_2017/",
-     "./binary_raster_md_tif/", 150, 150, 4, 2, 25000)
+    x_train_ae, y_train_ae = generate_training_patches.gen_training_patches("../../../media/disk2/datasets/all_maryalnd_naip/",
+     "./binary_raster_md_tif/", 150, 150, 4, 2, 10000)
 
     print(x_train_ae.shape)
     print(y_train_ae.shape)

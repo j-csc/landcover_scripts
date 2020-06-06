@@ -114,10 +114,11 @@ def main():
         count += 1
         print(e)
         subprocess.call(["python","./test_inference.py",
-                    "--input_fns", "../landcover-old/web_tool/tiles/m_3807537_ne_18_1_20170611.mrf",
-                    "--output_fns", f"./3807537_{count}.tif",
+                    "--input_fns", "../../../media/disk2/datasets/all_maryalnd_naip/m_3807537_ne_18_1_20170611.mrf",
+                    "--output_fns", f"./m_3807537_{count}.tif",
                     "--model", e,
-                    "--gpu", "1"])
+                    "--gpu", "2",
+                    "--save_probabilities"])
     # subprocess.call(["python","./test_inference.py",
     #             "--input_fns", "../../../media/disk2/datasets/maaryland_naip_2017/38075/m_3807536_se_18_1_20170611.mrf",
     #             "--output_fns", "./m_3807536_se_18_1_20170611_sup_uneven_best.tif",
@@ -125,7 +126,7 @@ def main():
     #             "--gpu", "1"])
     # subprocess.call(["python","./test_inference.py",
     #             "--input_fns", "../landcover-old/web_tool/tiles/m_3807537_ne_18_1_20170611.mrf",
-    #             "--output_fns", "./m_3807536_se_18_1_20170611_ae_even_best.tif",
+    #             "--output_fns", "./m_3807537_ne_18_1_20170611_ae_even_best.tif",
     #             "--model", "./new/experiment10/tmp_ae_even/ae_tuned_model_even_08_0.17.h5",
     #             "--gpu", "1"])
     # subprocess.call(["python","./test_inference.py",

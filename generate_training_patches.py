@@ -29,7 +29,8 @@ def gen_training_patches(x_fns, y_fns, width, height, channel, target, batch_siz
         y_fn = np.random.choice(ground_truth_set)
         folder_name = y_fn.split('/')[2][2:7]
         filename = y_fn.split('/')[2][:26]
-        x_fn = x_fns + folder_name + "/" + filename + ".mrf"
+        x_fn = x_fns + filename + ".mrf"
+        print(x_fn)
 
         # Load input file
         f = rasterio.open(x_fn, "r")
@@ -42,7 +43,6 @@ def gen_training_patches(x_fns, y_fns, width, height, channel, target, batch_siz
         f = rasterio.open(y_fn, "r")
         target = f.read().squeeze()
         f.close()
-        # print(target.shape)
 
         # Poultry pixels
         y_ind,x_ind = np.where(target==1)
@@ -53,45 +53,37 @@ def gen_training_patches(x_fns, y_fns, width, height, channel, target, batch_siz
                 x = np.random.randint(0, data.shape[1]-width)
                 y = np.random.randint(0, data.shape[0]-height)
 
+                # Force to choose chicken house pixel
                 if (len(np.unique(target)) == 2) and (len(np.unique((target[y:y+height, x:x+width]))) != 2):
                     rand_index = np.random.randint(0,len(x_ind))
                     x = x_ind[rand_index]
                     y = y_ind[rand_index]
                     temp_count = 0
                     while not (x >= 0 and x < data.shape[1]-width and y >= 0 and y < data.shape[0]-height):
-                        if (temp_count > 10):
+                        if (temp_count > 3):
                             x = np.random.randint(0, data.shape[1]-width)
                             y = np.random.randint(0, data.shape[0]-height)
                         rand_index = np.random.randint(0,len(x_ind))
                         x = x_ind[rand_index]
                         y = y_ind[rand_index]
                         temp_count += 1
-
-                # while (np.any((data[y:y+height, x:x+width, :] == 0).sum(axis=2) == data.shape[2])):
-                #     x = np.random.randint(0, data.shape[1]-width)
-                #     y = np.random.randint(0, data.shape[0]-height)
                 
                 # Set up x_batch with img data at y,x coords
                 img = data[y:y+height, x:x+width, :].astype(np.float32)
                 x_batches[count] = img
                 
-                # Set up target labels with 4 dim
-                temp_target = target[y:y+height, x:x+width]
+                # Center predict given context
+                label = target[y,x]
                 
-                for j in range(0, height):
-                    for k in range(0, width):
-                        label = target[j,k]
-                        y_batches[count,j,k,0] = 0
-                        y_batches[count,j,k,label+1] = 1
+                y_batches[count,75,75,0] = 0
+                y_batches[count,75,75,label+1] = 1
 
-                # print(np.unique(temp_target, return_counts=True))
-
-                if (np.count_nonzero(temp_target) != 0):
+                if (label != 0):
                     non_zero_count += 1
                 
                 count += 1
 
-                if count % 10 == 0:
+                if count % 1000 == 0:
                     print(f"Iteration: {count}")
 
     x_batches = x_batches/255.0
@@ -101,13 +93,16 @@ def gen_training_patches(x_fns, y_fns, width, height, channel, target, batch_siz
 
     print(non_zero_count / count)
 
+    np.save(x_batches, "x_train.npy")
+    np.save(y_batches, "y_train.npy")
+
     return x_batches, y_batches
 
 def main():
     # Sample 50k patches of 240x240 images
     
-    x,y = gen_training_patches("../../../media/disk2/datasets/maaryland_naip_2017/",
-     "./binary_raster_md_tif/", 240, 240, 4, 2, 1000)
+    x,y = gen_training_patches("../../../media/disk2/datasets/all_maryalnd_naip/",
+     "./binary_raster_md_tif/", 150, 150, 4, 2, 10000)
 
     # print(y)
     
