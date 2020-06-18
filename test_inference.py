@@ -173,7 +173,7 @@ def main():
             current_profile = curr_profile.copy()
             current_profile['driver'] = 'GTiff'
             current_profile['dtype'] = 'uint8'
-            current_profile['count'] = 3 # TODO: This assumes that there are 5 outputs, fix this
+            current_profile['count'] = 2 # TODO: This assumes that there are 5 outputs, fix this
             current_profile['compress'] = "lzw"
 
             # quantize the probabilities
@@ -184,7 +184,7 @@ def main():
             f = rasterio.open(t_output_fn, 'w', **current_profile)
             f.write(output[:,:,0], 1) # TODO: This assumes that there are 5 outputs, fix this
             f.write(output[:,:,1], 2) # TODO: This assumes that there are 5 outputs, fix this
-            f.write(output[:,:,2], 3) # TODO: This assumes that there are 5 outputs, fix this
+            # f.write(output[:,:,2], 3) # TODO: This assumes that there are 5 outputs, fix this
 
             f.close()
 

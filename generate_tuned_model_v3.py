@@ -105,14 +105,12 @@ def get_model(model_path, num_classes):
         "masked_categorical_crossentropy":keras.metrics.mean_squared_error
     })
     toutput = tmodel.layers[-2].output
-    toutput = Conv2D(num_classes+1, (1,1), padding="same", use_bias=True, activation="softmax", name="output_conv")(toutput)
+    toutput = Conv2D(num_classes, (1,1), padding="same", use_bias=True, activation="softmax", name="output_conv")(toutput)
     model = keras.models.Model(inputs=tmodel.inputs, outputs=[toutput])
 
     optimizer = Adam(lr=0.001)
-    loss_mask = np.zeros(num_classes+1)
-    loss_mask[0] = 1
 
-    model.compile(loss=K.binary_crossentropy, optimizer=optimizer)
+    model.compile(loss=K.categorical_crossentropy, optimizer=optimizer)
     
     return model
 
@@ -162,7 +160,7 @@ def train_model_from_points(in_geo_path, in_model_path_sup, in_model_path_ae, in
     # Load in sample
     print("Loading tiles...")
     x_train_ae, y_train_ae = generate_training_patches.gen_training_patches("../../../media/disk2/datasets/all_maryalnd_naip/",
-     "./binary_raster_md_tif/", 150, 150, 4, 2, 10000)
+     "./binary_raster_md_tif/", 150, 150, 4, 2, 5000)
 
     print(x_train_ae.shape)
     print(y_train_ae.shape)

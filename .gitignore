@@ -11,3 +11,6 @@ all_test_*/
 binary_raster_*/
 test_index_*/
 super_*
+xtrain*
+ytrain*
+gd_*

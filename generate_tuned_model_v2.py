@@ -146,9 +146,9 @@ def build_train_set(coords, labels, samples, method='uneven', target_cls=4):
 
 def train_model_from_points(in_geo_path, in_model_path_sup, in_model_path_ae, in_tile_path, out_model_path_sup, out_model_path_ae, num_classes, exp, even):
     # Train supervised
-    print("Loading initial models...")
-    model_sup = get_model(in_model_path_sup, num_classes)
-    model_sup.summary()
+    # print("Loading initial models...")
+    # model_sup = get_model(in_model_path_sup, num_classes)
+    # model_sup.summary()
 
     print("Loading tiles...")
     f = rasterio.open(in_tile_path)
@@ -212,40 +212,45 @@ def train_model_from_points(in_geo_path, in_model_path_sup, in_model_path_ae, in
     x_train = x_train / 255.0
     x_train_ae = x_train_ae / 255.0
 
+    print(y_train_ae)
+
+    np.save('gd_xtrain.npy', x_train_ae)
+    np.save('gd_ytrain.npy', y_train_ae)
+
     # Supervised tuning
 
-    print("Tuning supervised model")
+    # print("Tuning supervised model")
 
-    cpPath = f"./{exp}/tmp_sup_{even}/sup_tuned_model_{even}_"
+    # cpPath = f"./{exp}/tmp_sup_{even}/sup_tuned_model_{even}_"
 
-    checkpointer_sup = ModelCheckpoint(filepath=(cpPath+"{epoch:02d}_{loss:.2f}.h5"), monitor='loss', verbose=1)
+    # checkpointer_sup = ModelCheckpoint(filepath=(cpPath+"{epoch:02d}_{loss:.2f}.h5"), monitor='loss', verbose=1)
 
-    model_sup.fit(
-        x_train, y_train,
-        batch_size=10, epochs=10, verbose=1, validation_split=0,
-        callbacks=[checkpointer_sup]
-    )
+    # model_sup.fit(
+    #     x_train, y_train,
+    #     batch_size=10, epochs=10, verbose=1, validation_split=0,
+    #     callbacks=[checkpointer_sup]
+    # )
 
-    model_sup.save(out_model_path_sup)
+    # model_sup.save(out_model_path_sup)
 
-    # Unsupervised tuning
+    # # Unsupervised tuning
 
-    print("Tuning Unsupervised model")
+    # print("Tuning Unsupervised model")
 
-    model_ae = get_model(in_model_path_ae, num_classes)
-    model_ae.summary()
+    # model_ae = get_model(in_model_path_ae, num_classes)
+    # model_ae.summary()
 
-    cpPath = f"{exp}/tmp_ae_{even}/ae_tuned_model_{even}_"
+    # cpPath = f"{exp}/tmp_ae_{even}/ae_tuned_model_{even}_"
 
-    checkpointer_ae = ModelCheckpoint(filepath=(cpPath+"{epoch:02d}_{loss:.2f}.h5"), monitor='loss', verbose=1)
+    # checkpointer_ae = ModelCheckpoint(filepath=(cpPath+"{epoch:02d}_{loss:.2f}.h5"), monitor='loss', verbose=1)
 
-    model_ae.fit(
-        x_train_ae, y_train_ae,
-        batch_size=10, epochs=10, verbose=1, validation_split=0,
-        callbacks=[checkpointer_ae]
-    )
+    # model_ae.fit(
+    #     x_train_ae, y_train_ae,
+    #     batch_size=10, epochs=10, verbose=1, validation_split=0,
+    #     callbacks=[checkpointer_ae]
+    # )
 
-    model_ae.save(out_model_path_ae)
+    # model_ae.save(out_model_path_ae)
 
 
 def main():
