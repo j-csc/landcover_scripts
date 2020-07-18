@@ -19,10 +19,10 @@ def gen_training_patches(x_fns, y_fns, width, height, channel, target, batch_siz
     non_zero_count = 0
 
     # Optional, for south, north maryland check
-    if loc == 'south':
-        ground_truth_set = [i for i in ground_truth_set if '38075' in i or '38076' in i or '38077' in i]
-    else:
-        ground_truth_set = [i for i in ground_truth_set if '39075' in i or '39076' in i or '39077' in i]
+    # if loc == 'south':
+    #     ground_truth_set = [i for i in ground_truth_set if '38075' in i or '38076' in i or '38077' in i]
+    # else:
+    #     ground_truth_set = [i for i in ground_truth_set if '39075' in i or '39076' in i or '39077' in i and '3807540' not in i and '3807558' not in i]
 
     while count < batch_size:
         # Randomly choose a file from input list
@@ -60,7 +60,7 @@ def gen_training_patches(x_fns, y_fns, width, height, channel, target, batch_siz
                     y = y_ind[rand_index]
                     temp_count = 0
                     while not (x-width >= 0 and x+width < data.shape[1] and y-height >= 0 and y+height < data.shape[0]):
-                        if (temp_count > 3):
+                        if (temp_count > 2):
                             x = np.random.randint(0, data.shape[1]-width)
                             y = np.random.randint(0, data.shape[0]-height)
                         rand_index = np.random.randint(0,len(x_ind))

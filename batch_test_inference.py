@@ -8,6 +8,7 @@ def do_work(work, gpu_idx):
     while not work.empty():
         fn = work.get()
         filename = (fn.split("/")[-1].split(".")[0])
+        print(fn)
 
         #################
         # Generate index
@@ -36,12 +37,12 @@ def do_work(work, gpu_idx):
         # Test Inference
         #################
 
-        # out_fn = f"./post_processed_md_inference/{filename}_processed.geojson"
-        # subprocess.call(["python","./test_inference.py",
-        #     "--input_fns", fn,
-        #     "--output_fns", out_fn,
-        #     "--model", "./new/experiment10/tmp_ae_even/ae_tuned_model_even_08_0.17.h5",
-        #     "--gpu", str(gpu_idx)])
+        out_fn = f"./new_md_inference/{filename}_processed.geojson"
+        subprocess.call(["python","./test_inference.py",
+            "--input_fns", fn,
+            "--output_fns", out_fn,
+            "--model", "./test_run_1/tmp_ae_even/ae_tuned_model_even_06_0.00.h5",
+            "--gpu", str(gpu_idx)])
         # subprocess.call(["python","./post_processing.py",
         #     "--input_fn", fn,
         #     "--output_fn", out_fn,
@@ -90,13 +91,15 @@ def batch_run(ALL_FNS):
 def main():
     # Batch run inference
     # fn_folders = glob.glob("../../../media/disk1/datasets/delaware_data/de_100cm_2017/*") # Delaware
-    # fn_folders = glob.glob("../../../media/disk2/datasets/maaryland_naip_2017/*") # MD
+    fn_folders = glob.glob("../../../media/disk2/datasets/all_maryalnd_naip/*.mrf") # MD
     # all_fns = []
     # for fn_folder in fn_folders:
     #     fns = (glob.glob(fn_folder + "/*.mrf"))
+    #     print(fns)
     #     for fn in fns:
     #         all_fns.append(fn)
-    # batch_run(all_fns)
+    # print(fn_folders)
+    batch_run(fn_folders)
 
     # Batch run post-processing
     # fn_folders = glob.glob("./binary_raster_md/*")
@@ -108,17 +111,17 @@ def main():
     # ogr2ogr -clipsrc md_test_index.geojson md_test_clipped.shp ../notebooks/Delmarva_PL_House_Final/Delmarva_PL_House_Final.shp
 
     # Small batch inference
-    exps = (glob.glob("./test_run_1/tmp_ae_even/*"))
-    count = 0
-    for e in exps:
-        count += 1
-        print(e)
-        subprocess.call(["python","./test_inference.py",
-                    "--input_fns", "../../../media/disk2/datasets/all_maryalnd_naip/m_3807537_ne_18_1_20170611.mrf",
-                    "--output_fns", f"./m_3807537_{count}.tif",
-                    "--model", e,
-                    "--gpu", "2",
-                    "--save_probabilities"])
+    # exps = (glob.glob("./test_run_1/tmp_ae_even/*"))
+    # count = 0
+    # for e in exps:
+    #     count += 1
+    #     print(e)
+    #     subprocess.call(["python","./test_inference.py",
+    #                 "--input_fns", "../../../media/disk2/datasets/all_maryalnd_naip/m_3807537_ne_18_1_20170611.mrf",
+    #                 "--output_fns", f"./m_3807537_{count}.tif",
+    #                 "--model", e,
+    #                 "--gpu", "2",
+    #                 "--save_probabilities"])
     # subprocess.call(["python","./test_inference.py",
     #             "--input_fns", "../../../media/disk2/datasets/maaryland_naip_2017/38075/m_3807536_se_18_1_20170611.mrf",
     #             "--output_fns", "./m_3807536_se_18_1_20170611_sup_uneven_best.tif",

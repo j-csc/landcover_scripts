@@ -160,7 +160,7 @@ def train_model_from_points(in_geo_path, in_model_path_sup, in_model_path_ae, in
     # Load in sample
     print("Loading tiles...")
     x_train_ae, y_train_ae = generate_training_patches.gen_training_patches("../../../media/disk2/datasets/all_maryalnd_naip/",
-     "./binary_raster_md_tif/", 150, 150, 4, 2, 5000)
+     "./binary_raster_md_tif/", 150, 150, 4, 2, 50000)
 
     print(x_train_ae.shape)
     print(y_train_ae.shape)
