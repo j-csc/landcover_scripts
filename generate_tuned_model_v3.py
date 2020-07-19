@@ -74,6 +74,12 @@ K.tensorflow_backend._get_available_gpus = _get_available_gpus
 print(K.tensorflow_backend._get_available_gpus())
 # Sample: python generate_tuned_model_v3.py --in_geo_path ./binary_raster_md/ --in_tile_path ./binary_raster_md_tif/ --in_model_path_sup ../landcover-old/web_tool/data/naip_demo_model.h5 --in_model_path_ae ../landcover-old/web_tool/data/naip_autoencoder.h5 --out_model_path_sup ./naip_demo_tuned.h5 --out_model_path_ae ./naip_autoencoder_tuned.h5 --num_classes 2 --gpu 1 --exp 1 --even even
 
+def iou_coef(y_true, y_pred, smooth=1):
+  intersection = K.sum(K.abs(y_true * y_pred), axis=[1,2,3])
+  union = K.sum(y_true,[1,2,3])+K.sum(y_pred,[1,2,3])-intersection
+  iou = K.mean((intersection + smooth) / (union + smooth), axis=0)
+  return iou
+
 def masked_categorical_crossentropy(y_true, y_pred):
     
     mask = K.all(K.equal(y_true, [1,0,0,0,0,0]), axis=-1)
@@ -110,46 +116,14 @@ def get_model(model_path, num_classes):
 
     optimizer = Adam(lr=0.001)
 
-    model.compile(loss=K.categorical_crossentropy, optimizer=optimizer)
+    model.compile(loss=K.categorical_crossentropy, optimizer=optimizer, metrics=[iou_coef])
     
     return model
 
+
+# Using validation split of 0.33
+
 def train_model_from_points(in_geo_path, in_model_path_sup, in_model_path_ae, in_tile_path, out_model_path_sup, out_model_path_ae, num_classes, exp, even):
-    # Train supervised
-    # print("Loading initial models...")
-    # model_sup = get_model(in_model_path_sup, num_classes)
-    # model_sup.summary()
-
-    # # Load in sample
-    # print("Loading tiles...")
-    # x_train, y_train = generate_training_patches.gen_training_patches("../../../media/disk2/datasets/maaryland_naip_2017/",
-    #  "./binary_raster_md_tif/", 240, 240, 4, 2, 50000)
-
-    # print(x_train.shape)
-    # print(y_train.shape)
-
-    # y_train_ae[:,:,:] = [1] + [0] * (y_train_ae.shape[-1]-1)
-    # y_train[:,:,:] = [1] + [0] * (y_train.shape[-1]-1)
-
-    # x_train = x_train / 255.0
-    # x_train_ae = x_train_ae / 255.0
-
-    # Supervised tuning
-
-    # print("Tuning supervised model")
-
-    # cpPath = f"./{exp}/tmp_sup_{even}/sup_tuned_model_{even}_"
-
-    # checkpointer_sup = ModelCheckpoint(filepath=(cpPath+"{epoch:02d}_{loss:.2f}.h5"), monitor='loss', verbose=1)
-
-    # model_sup.fit(
-    #     x_train, y_train,
-    #     batch_size=10, epochs=10, verbose=1, validation_split=0,
-    #     callbacks=[checkpointer_sup]
-    # )
-
-    # model_sup.save(out_model_path_sup)
-
     # Unsupervised tuning
 
     print("Tuning Unsupervised model")
@@ -159,19 +133,16 @@ def train_model_from_points(in_geo_path, in_model_path_sup, in_model_path_ae, in
 
     # Load in sample
     print("Loading tiles...")
-    x_train_ae, y_train_ae = generate_training_patches.gen_training_patches("../../../media/disk2/datasets/all_maryalnd_naip/",
+    X, Y = generate_training_patches.gen_training_patches("../../../media/disk2/datasets/all_maryalnd_naip/",
      "./binary_raster_md_tif/", 150, 150, 4, 2, 50000)
-
-    print(x_train_ae.shape)
-    print(y_train_ae.shape)
 
     cpPath = f"{exp}/tmp_ae_{even}/ae_tuned_model_{even}_"
 
     checkpointer_ae = ModelCheckpoint(filepath=(cpPath+"{epoch:02d}_{loss:.2f}.h5"), monitor='loss', verbose=1)
 
     model_ae.fit(
-        x_train_ae, y_train_ae,
-        batch_size=10, epochs=10, verbose=1, validation_split=0,
+        X, Y,
+        batch_size=10, epochs=10, verbose=1, validation_split=0.2,
         callbacks=[checkpointer_ae]
     )
 

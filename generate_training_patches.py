@@ -30,7 +30,7 @@ def gen_training_patches(x_fns, y_fns, width, height, channel, target, batch_siz
         folder_name = y_fn.split('/')[2][2:7]
         filename = y_fn.split('/')[2][:26]
         x_fn = x_fns + filename + ".mrf"
-        print(x_fn)
+        # print(x_fn)
 
         # Load input file
         f = rasterio.open(x_fn, "r")
@@ -71,7 +71,6 @@ def gen_training_patches(x_fns, y_fns, width, height, channel, target, batch_siz
                 while not (x-width >= 0 and x+width < data.shape[1] and y-height >= 0 and y+height < data.shape[0]):
                     x = np.random.randint(0, data.shape[1]-width)
                     y = np.random.randint(0, data.shape[0]-height)
-                
 
                 # MAKE x,y THE CENTER
 
@@ -97,7 +96,7 @@ def gen_training_patches(x_fns, y_fns, width, height, channel, target, batch_siz
 
     print(y_batches.shape)
 
-    print(non_zero_count / count)
+    print("Ratio of chicken house to non-chicken: {}".format(non_zero_count / count))
 
     # np.save('./xtrain.npy',x_batches)
     # np.save('./ytrain.npy',y_batches)
