@@ -76,13 +76,13 @@ def gen_training_patches(x_fns, y_fns, width, height, channel, target, batch_siz
                 # MAKE x,y THE CENTER
 
                 # Set up x_batch with img data at y,x coords
-                img = data[y-(height/2):y+(height/2), x-(width/2):x+(width/2), :].astype(np.float32)
+                img = data[y-(height//2):y+(height//2), x-(width//2):x+(width//2), :].astype(np.float32)
                 x_batches[count] = img
                 
                 # Center predict given context
                 label = target[y,x]
 
-                y_batches[count,height/2,width/2,label] = 1
+                y_batches[count,height//2,width//2,label] = 1
 
                 if (label != 0):
                     non_zero_count += 1

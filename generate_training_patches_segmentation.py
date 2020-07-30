@@ -73,7 +73,7 @@ def gen_training_patches_single_center_pixel(x_fns, y_fns, width, height, channe
         # Center predict given context
         label = target[y,x]
 
-        y_batches[count,75,75,label] = 1
+        y_batches[count,height/2,width/2,label] = 1
 
         if (label != 0):
             non_zero_count += 1
@@ -159,29 +159,29 @@ def gen_training_patches_single_dense(x_fns, y_fns, width, height, channel, targ
         # MAKE x,y THE CENTER
 
         # Set up x_batch with img data at y,x coords
-        img = data[y-75:y+74+1, x-75:x+74+1, :].astype(np.float32)
+        img = data[y-(height//2):y+(height//2), x-(width//2):x+(width//2), :].astype(np.float32)
         x_batches[count] = img
         
         # Center predict given context
-        for i in range
         label = target[y,x]
+        print(label)
 
-        y_batches[count,75,75,label] = 1
+    #     y_batches[count,75,75,label] = 1
 
-        if (label != 0):
-            non_zero_count += 1
+    #     if (label != 0):
+    #         non_zero_count += 1
         
-        count += 1
+    #     count += 1
 
-        if count % 1000 == 0:
-            print(f"Iteration: {count}")
+    #     if count % 1000 == 0:
+    #         print(f"Iteration: {count}")
 
-    x_batches = x_batches/255.0
-    # y_batches = keras.utils.to_categorical(y_batches, num_classes=2)
+    # x_batches = x_batches/255.0
+    # # y_batches = keras.utils.to_categorical(y_batches, num_classes=2)
 
-    print(y_batches.shape)
+    # print(y_batches.shape)
 
-    print("Ratio of chicken house to non-chicken: {}".format(non_zero_count / count))
+    # print("Ratio of chicken house to non-chicken: {}".format(non_zero_count / count))
 
     # np.save('./xtrain.npy',x_batches)
     # np.save('./ytrain.npy',y_batches)
