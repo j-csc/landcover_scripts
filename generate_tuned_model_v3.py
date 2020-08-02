@@ -12,6 +12,11 @@ import json
 import rasterio
 import fiona
 import fiona.transform
+from sklearn.model_selection import train_test_split
+
+# How to use: 
+# python generate_tuned_model_v3.py --in_tile_path ../../../media/disk2/datasets/all_maryalnd_naip/  --in_model_path_ae ../landcover-old/web_tool/data/naip_autoencoder.h5  --out_model_path_ae ./naip_autoencoder_tuned.h5 --num_classes 2 --gpu 1 --exp 1 --even even
+
 
 # Here we look through the args to find which GPU we should use
 # We must do this before importing keras, which is super hacky
@@ -51,11 +56,11 @@ from keras.layers import Input, Dense, Activation, MaxPooling2D, Conv2D, BatchNo
 from keras.layers import Concatenate, Cropping2D, Lambda
 from keras.losses import categorical_crossentropy, binary_crossentropy
 from keras.preprocessing.image import ImageDataGenerator
-from keras.callbacks import ModelCheckpoint
+from keras.callbacks import ModelCheckpoint, EarlyStopping
 import pandas as pd
 from scipy.signal import convolve2d
 import custom_loss
-import generate_training_patches
+import generate_training_patches_segmentation
 
 
 def _get_available_gpus():
@@ -72,7 +77,7 @@ def _get_available_gpus():
 
 K.tensorflow_backend._get_available_gpus = _get_available_gpus
 print(K.tensorflow_backend._get_available_gpus())
-# Sample: python generate_tuned_model_v3.py --in_geo_path ./binary_raster_md/ --in_tile_path ./binary_raster_md_tif/ --in_model_path_sup ../landcover-old/web_tool/data/naip_demo_model.h5 --in_model_path_ae ../landcover-old/web_tool/data/naip_autoencoder.h5 --out_model_path_sup ./naip_demo_tuned.h5 --out_model_path_ae ./naip_autoencoder_tuned.h5 --num_classes 2 --gpu 1 --exp 1 --even even
+# Sample: python generate_tuned_model_v3.py --in_tile_path ../../../media/disk2/datasets/all_maryalnd_naip/  --in_model_path_ae ../landcover-old/web_tool/data/naip_autoencoder.h5  --out_model_path_ae ./naip_autoencoder_tuned.h5 --num_classes 2 --gpu 1 --exp test_run --exp_type single_tile_4000s
 
 def iou_coef(y_true, y_pred, smooth=1):
   intersection = K.sum(K.abs(y_true * y_pred), axis=[1,2,3])
@@ -120,10 +125,7 @@ def get_model(model_path, num_classes):
     
     return model
 
-
-# Using validation split of 0.33
-
-def train_model_from_points(in_geo_path, in_model_path_sup, in_model_path_ae, in_tile_path, out_model_path_sup, out_model_path_ae, num_classes, exp, even):
+def train_model_from_points(in_model_path_ae, in_tile_path, out_model_path_ae, num_classes, exp, exp_type):
     # Unsupervised tuning
 
     print("Tuning Unsupervised model")
@@ -133,38 +135,54 @@ def train_model_from_points(in_geo_path, in_model_path_sup, in_model_path_ae, in
 
     # Load in sample
     print("Loading tiles...")
-    X, Y = generate_training_patches.gen_training_patches("../../../media/disk2/datasets/all_maryalnd_naip/",
-     "./binary_raster_md_tif/", 150, 150, 4, 2, 50000)
+    
+    # X, Y = generate_training_patches_segmentation.gen_training_patches_center_and_dense("../../../media/disk2/datasets/all_maryalnd_naip/",
+    #  "./binary_raster_md_tif/", 150, 150, 4, 2, 4000, test=True)
 
-    cpPath = f"{exp}/tmp_ae_{even}/ae_tuned_model_{even}_"
+    # Testing single tile m_3807537_ne
+    X, Y = generate_training_patches_segmentation.gen_training_patches_center_and_dense_single("../../../media/disk2/datasets/all_maryalnd_naip/",
+    "./binary_raster_md_tif/", 150, 150, 4, 2, 4000, test=True)
+
+    # Train test split (Takes 3000 for train [1000 from train for validation], Test 1000)
+    x_train, x_test, y_train, y_test = train_test_split(X,Y,train_size=0.75, test_size=0.25, random_state=42)
+
+    # X = np.load("./x_dense.npy")
+    # Y = np.load("./y_dense.npy")
+
+    cpPath = f"{exp}/{exp_type}/ae_tuned_model_"
 
     checkpointer_ae = ModelCheckpoint(filepath=(cpPath+"{epoch:02d}_{loss:.2f}.h5"), monitor='loss', verbose=1)
 
+    es = EarlyStopping(monitor='iou_coef', min_delta=0.05, patience=3)
+
     model_ae.fit(
-        X, Y,
-        batch_size=10, epochs=10, verbose=1, validation_split=0.2,
-        callbacks=[checkpointer_ae]
+        x_train, y_train,
+        batch_size=10, epochs=10, verbose=1, validation_split=0.33,
+        callbacks=[checkpointer_ae, es]
     )
 
     model_ae.save(out_model_path_ae)
+
+    print("Testing")
+
+    res = model_ae.evaluate(x_test, y_test)
+
+    print(res)
 
 def main():
     parser = argparse.ArgumentParser(description="Generate a model tuned using webtool")
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose debugging", default=False)
     # Input
-    parser.add_argument("--in_geo_path", action="store", dest="in_geo_path", type=str, help="Input geojson dir path (i.e. ../data/output.geojson)", required=True)
     parser.add_argument("--in_tile_path", action="store", dest="in_tile_path", type=str, help="Path to input tif dir", required=True)
     # Models
-    parser.add_argument("--in_model_path_sup", action="store", dest="in_model_path_sup", type=str, help="Path to supervised model that needs retraining", required=True)
     parser.add_argument("--in_model_path_ae", action="store", dest="in_model_path_ae", type=str, help="Path to unsupervised model that needs retraining", required=True)
-    parser.add_argument("--out_model_path_sup", action="store", dest="out_model_path_sup", type=str, help="Output path for tuned supervised model", required=True)
     parser.add_argument("--out_model_path_ae", action="store", dest="out_model_path_ae", type=str, help="Output path for tuned unsupervised model", required=True)
     # Custom
     parser.add_argument("--num_classes", action="store", dest="num_classes", type=str, help="Number of classes", required=True)
     parser.add_argument("--gpu", action="store", dest="gpuid", type=int, help="GPU to use", required=True)
     # Experiment argument
     parser.add_argument("--exp", action="store",dest="exp", type=str, required=True)
-    parser.add_argument("--even", action="store",dest="evenodd", type=str, required=True)
+    parser.add_argument("--exp_type", action="store",dest="exp_type", type=str, required=True)
 
     args = parser.parse_args(sys.argv[1:])
     args.batch_size=10
@@ -176,11 +194,7 @@ def main():
 
     start_time = float(time.time())
 
-    print("GeoJson file read at {}".format(args.in_geo_path))
-
-    print("Retraining model from GeoJson")
-
-    train_model_from_points(args.in_geo_path, args.in_model_path_sup, args.in_model_path_ae, args.in_tile_path, args.out_model_path_sup, args.out_model_path_ae, int(args.num_classes), args.exp, args.evenodd)
+    train_model_from_points(args.in_model_path_ae, args.in_tile_path, args.out_model_path_ae, int(args.num_classes), args.exp, args.exp_type)
 
     print("Finished in %0.4f seconds" % (time.time() - start_time))
     

@@ -91,7 +91,11 @@ def batch_run(ALL_FNS):
 def main():
     # Batch run inference
     # fn_folders = glob.glob("../../../media/disk1/datasets/delaware_data/de_100cm_2017/*") # Delaware
-    fn_folders = glob.glob("../../../media/disk2/datasets/all_maryalnd_naip/*.mrf") # MD
+    
+    
+    # fn_folders = glob.glob("../../../media/disk2/datasets/all_maryalnd_naip/*.mrf") # MD
+    
+    
     # all_fns = []
     # for fn_folder in fn_folders:
     #     fns = (glob.glob(fn_folder + "/*.mrf"))
@@ -99,7 +103,9 @@ def main():
     #     for fn in fns:
     #         all_fns.append(fn)
     # print(fn_folders)
-    batch_run(fn_folders)
+
+
+    # batch_run(fn_folders)
 
     # Batch run post-processing
     # fn_folders = glob.glob("./binary_raster_md/*")
@@ -111,17 +117,19 @@ def main():
     # ogr2ogr -clipsrc md_test_index.geojson md_test_clipped.shp ../notebooks/Delmarva_PL_House_Final/Delmarva_PL_House_Final.shp
 
     # Small batch inference
-    # exps = (glob.glob("./test_run_1/tmp_ae_even/*"))
-    # count = 0
-    # for e in exps:
-    #     count += 1
-    #     print(e)
-    #     subprocess.call(["python","./test_inference.py",
-    #                 "--input_fns", "../../../media/disk2/datasets/all_maryalnd_naip/m_3807537_ne_18_1_20170611.mrf",
-    #                 "--output_fns", f"./m_3807537_{count}.tif",
-    #                 "--model", e,
-    #                 "--gpu", "2",
-    #                 "--save_probabilities"])
+    exps = (glob.glob("./test_run/single_tile_4000s/*"))
+    count = 0
+    for e in exps:
+        count += 1
+        # print(e)
+        output_name = (e.split("/")[-1])[:-8]
+        print(output_name)
+        subprocess.call(["python","./test_inference.py",
+                    "--input_fns", "../../../media/disk2/datasets/all_maryalnd_naip/m_3807537_ne_18_1_20170611.mrf",
+                    "--output_fns", f"./test_run/single_tile_4000s_inf/{output_name}_single_inference.tif",
+                    "--model", e,
+                    "--gpu", "2",
+                    "--save_probabilities"])
     # subprocess.call(["python","./test_inference.py",
     #             "--input_fns", "../../../media/disk2/datasets/maaryland_naip_2017/38075/m_3807536_se_18_1_20170611.mrf",
     #             "--output_fns", "./m_3807536_se_18_1_20170611_sup_uneven_best.tif",

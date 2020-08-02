@@ -139,7 +139,8 @@ def main():
         "jaccard_loss":keras.metrics.mean_squared_error,
         "loss":keras.metrics.mean_squared_error,
         "masked_categorical_crossentropy":keras.metrics.mean_squared_error,
-        "custom_loss_fn": keras.metrics.mean_squared_error
+        "custom_loss_fn": keras.metrics.mean_squared_error,
+        "iou_coef": keras.metrics.mean_squared_error,
     })
 
     output_shape = model.output_shape[1:]
