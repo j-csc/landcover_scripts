@@ -15,3 +15,5 @@ xtrain*
 ytrain*
 gd_*
 test_run/
+x_dense*
+y_dense*

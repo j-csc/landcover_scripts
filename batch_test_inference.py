@@ -37,11 +37,11 @@ def do_work(work, gpu_idx):
         # Test Inference
         #################
 
-        out_fn = f"./new_md_inference/{filename}_processed.geojson"
+        out_fn = f"./test_run/multi_tile_50000s_inf_1/{filename}_multi_inference.tif"
         subprocess.call(["python","./test_inference.py",
             "--input_fns", fn,
             "--output_fns", out_fn,
-            "--model", "./test_run_1/tmp_ae_even/ae_tuned_model_even_06_0.00.h5",
+            "--model", "./test_run/multi_tile_50000s/ae_tuned_model_01_0.05.h5",
             "--gpu", str(gpu_idx)])
         # subprocess.call(["python","./post_processing.py",
         #     "--input_fn", fn,
@@ -92,20 +92,18 @@ def main():
     # Batch run inference
     # fn_folders = glob.glob("../../../media/disk1/datasets/delaware_data/de_100cm_2017/*") # Delaware
     
+    fn_folders = glob.glob("../../../media/disk2/datasets/all_maryalnd_naip/m_39075*.mrf") # MD
     
-    # fn_folders = glob.glob("../../../media/disk2/datasets/all_maryalnd_naip/*.mrf") # MD
-    
-    
-    # all_fns = []
-    # for fn_folder in fn_folders:
-    #     fns = (glob.glob(fn_folder + "/*.mrf"))
-    #     print(fns)
-    #     for fn in fns:
-    #         all_fns.append(fn)
-    # print(fn_folders)
+    all_fns = []
+    for fn_folder in fn_folders:
+        fns = (glob.glob(fn_folder + "/*.mrf"))
+        print(fns)
+        for fn in fns:
+            all_fns.append(fn)
+    print(fn_folders)
 
 
-    # batch_run(fn_folders)
+    batch_run(fn_folders)
 
     # Batch run post-processing
     # fn_folders = glob.glob("./binary_raster_md/*")
@@ -117,25 +115,24 @@ def main():
     # ogr2ogr -clipsrc md_test_index.geojson md_test_clipped.shp ../notebooks/Delmarva_PL_House_Final/Delmarva_PL_House_Final.shp
 
     # Small batch inference
-    exps = (glob.glob("./test_run/single_tile_4000s/*"))
-    count = 0
-    for e in exps:
-        count += 1
-        # print(e)
-        output_name = (e.split("/")[-1])[:-8]
-        print(output_name)
-        subprocess.call(["python","./test_inference.py",
-                    "--input_fns", "../../../media/disk2/datasets/all_maryalnd_naip/m_3807537_ne_18_1_20170611.mrf",
-                    "--output_fns", f"./test_run/single_tile_4000s_inf/{output_name}_single_inference.tif",
-                    "--model", e,
-                    "--gpu", "2",
-                    "--save_probabilities"])
+    # exps = (glob.glob("./test_run/single_tile_4000s/*"))
+    # count = 0
+    # for e in exps:
+    #     count += 1
+    #     # print(e)
+    #     output_name = (e.split("/")[-1])[:-8]
+    #     print(output_name)
+    #     subprocess.call(["python","./test_inference.py",
+    #                 "--input_fns", "../../../media/disk2/datasets/all_maryalnd_naip/m_3807708_sw_18_1_20170716.mrf",
+    #                 "--output_fns", f"./test_run/single_tile_4000s_inf_3/{output_name}_single_inference.tif",
+    #                 "--model", e,
+    #                 "--gpu", "2"])
     # subprocess.call(["python","./test_inference.py",
     #             "--input_fns", "../../../media/disk2/datasets/maaryland_naip_2017/38075/m_3807536_se_18_1_20170611.mrf",
     #             "--output_fns", "./m_3807536_se_18_1_20170611_sup_uneven_best.tif",
     #             "--model", "./new/experiment9/tmp_sup_uneven/sup_tuned_model_uneven_03_0.24.h5",
     #             "--gpu", "1"])
-    # subprocess.call(["python","./test_inference.py",
+    # subprocess.call(["python","./test_inference.py",ss
     #             "--input_fns", "../landcover-old/web_tool/tiles/m_3807537_ne_18_1_20170611.mrf",
     #             "--output_fns", "./m_3807537_ne_18_1_20170611_ae_even_best.tif",
     #             "--model", "./new/experiment10/tmp_ae_even/ae_tuned_model_even_08_0.17.h5",

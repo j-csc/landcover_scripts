@@ -140,14 +140,16 @@ def train_model_from_points(in_model_path_ae, in_tile_path, out_model_path_ae, n
     #  "./binary_raster_md_tif/", 150, 150, 4, 2, 4000, test=True)
 
     # Testing single tile m_3807537_ne
-    X, Y = generate_training_patches_segmentation.gen_training_patches_center_and_dense_single("../../../media/disk2/datasets/all_maryalnd_naip/",
-    "./binary_raster_md_tif/", 150, 150, 4, 2, 4000, test=True)
+    # X, Y = generate_training_patches_segmentation.gen_training_patches_center_and_dense_single("../../../media/disk2/datasets/all_maryalnd_naip/",
+    # "./binary_raster_md_tif/", 150, 150, 4, 2, 4000, test=True)
 
     # Train test split (Takes 3000 for train [1000 from train for validation], Test 1000)
-    x_train, x_test, y_train, y_test = train_test_split(X,Y,train_size=0.75, test_size=0.25, random_state=42)
+    # x_train, x_test, y_train, y_test = train_test_split(X,Y,train_size=0.75, test_size=0.25, random_state=42)
 
-    # X = np.load("./x_dense.npy")
-    # Y = np.load("./y_dense.npy")
+    X = np.load("./x_dense.npy")
+    Y = np.load("./y_dense.npy")
+    X_val = np.load("./x_dense_val.npy")
+    Y_val = np.load("./y_dense_val.npy")
 
     cpPath = f"{exp}/{exp_type}/ae_tuned_model_"
 
@@ -156,18 +158,18 @@ def train_model_from_points(in_model_path_ae, in_tile_path, out_model_path_ae, n
     es = EarlyStopping(monitor='iou_coef', min_delta=0.05, patience=3)
 
     model_ae.fit(
-        x_train, y_train,
-        batch_size=10, epochs=10, verbose=1, validation_split=0.33,
+        X, Y,
+        batch_size=10, epochs=10, verbose=1, validation_data=(X_val, Y_val),
         callbacks=[checkpointer_ae, es]
     )
 
     model_ae.save(out_model_path_ae)
 
-    print("Testing")
+    # print("Testing")
 
-    res = model_ae.evaluate(x_test, y_test)
+    # res = model_ae.evaluate(x_test, y_test)
 
-    print(res)
+    # print(res)
 
 def main():
     parser = argparse.ArgumentParser(description="Generate a model tuned using webtool")

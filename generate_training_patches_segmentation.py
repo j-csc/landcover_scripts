@@ -223,7 +223,7 @@ def gen_training_patches_center_and_dense(x_fns, y_fns, width, height, channel, 
     ground_truth_set = glob.glob(y_fns + "*")
 
     if (test == True):
-        ground_truth_set = [x for x in ground_truth_set if "m_3807537_ne" in x]
+        ground_truth_set = [x for x in ground_truth_set if "m_39075" in x]
 
     count = 0
     non_zero_count = 0
@@ -315,15 +315,15 @@ def gen_training_patches_center_and_dense(x_fns, y_fns, width, height, channel, 
 
     print("Ratio of chicken house to non-chicken: {}".format(non_zero_count / count))
     print("# of chicken house patches: {}".format(non_zero_count))
-    # np.save('./x_dense.npy',x_batches)
-    # np.save('./y_dense.npy',y_batches)
+    # np.save('./x_dense_val.npy',x_batches)
+    # np.save('./y_dense_val.npy',y_batches)
     # np.save('./y_single.npy', y_batches_single)
 
     return x_batches, y_batches
 
 def main():
-    # _,_ = gen_training_patches_single_center_and_dense("../../../media/disk2/datasets/all_maryalnd_naip/",
-    #  "./binary_raster_md_tif/", 150, 150, 4, 2, 2000)
+    _,_ = gen_training_patches_center_and_dense("../../../media/disk2/datasets/all_maryalnd_naip/",
+     "./binary_raster_md_tif/", 150, 150, 4, 2, 10000, test=True)
 
     # print(y)
     
