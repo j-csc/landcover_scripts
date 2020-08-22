@@ -37,11 +37,11 @@ def do_work(work, gpu_idx):
         # Test Inference
         #################
 
-        out_fn = f"./test_run/multi_tile_50000s_inf_1/{filename}_multi_inference.tif"
+        out_fn = f"./test_run/multi_tile_50000s_inf_3/{filename}_multi_inference.tif"
         subprocess.call(["python","./test_inference.py",
             "--input_fns", fn,
             "--output_fns", out_fn,
-            "--model", "./test_run/multi_tile_50000s/ae_tuned_model_01_0.05.h5",
+            "--model", "./test_run/multi_tile_50000s/ae_tuned_model_03_0.02.h5",
             "--gpu", str(gpu_idx)])
         # subprocess.call(["python","./post_processing.py",
         #     "--input_fn", fn,
