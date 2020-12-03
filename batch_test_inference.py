@@ -37,11 +37,11 @@ def do_work(work, gpu_idx):
         # Test Inference
         #################
 
-        out_fn = f"./test_run/multi_tile_50000s_inf_3/{filename}_multi_inference.tif"
+        out_fn = f"./test_run/multi_tile_50000s_reg_1/{filename}_multi_inference.tif"
         subprocess.call(["python","./test_inference.py",
             "--input_fns", fn,
             "--output_fns", out_fn,
-            "--model", "./test_run/multi_tile_50000s/ae_tuned_model_03_0.02.h5",
+            "--model", "./test_run/single_tile_4000s/ae_tuned_model_04_0.03.h5",
             "--gpu", str(gpu_idx)])
         # subprocess.call(["python","./post_processing.py",
         #     "--input_fn", fn,
@@ -92,7 +92,7 @@ def main():
     # Batch run inference
     # fn_folders = glob.glob("../../../media/disk1/datasets/delaware_data/de_100cm_2017/*") # Delaware
     
-    fn_folders = glob.glob("../../../media/disk2/datasets/all_maryalnd_naip/m_39075*.mrf") # MD
+    fn_folders = glob.glob("../../../media/disk2/datasets/all_maryalnd_naip/m_38075*.mrf") # MD
     
     all_fns = []
     for fn_folder in fn_folders:

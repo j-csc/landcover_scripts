@@ -13,6 +13,7 @@ import rasterio
 import fiona
 import fiona.transform
 from sklearn.model_selection import train_test_split
+from sklearn.utils import class_weight
 
 # How to use: 
 # python generate_tuned_model_v3.py --in_tile_path ../../../media/disk2/datasets/all_maryalnd_naip/  --in_model_path_ae ../landcover-old/web_tool/data/naip_autoencoder.h5  --out_model_path_ae ./naip_autoencoder_tuned.h5 --num_classes 2 --gpu 1 --exp 1 --even even
@@ -47,7 +48,7 @@ print("Num GPUs Available: ", len(tf.config.experimental.list_physical_devices('
 
 
 import keras
-import keras.backend as K
+import tensorflow.keras.backend as K
 import keras.callbacks
 import keras.utils
 import tensorflow as tf
@@ -58,26 +59,14 @@ from keras.losses import categorical_crossentropy, binary_crossentropy
 from keras.preprocessing.image import ImageDataGenerator
 from keras.callbacks import ModelCheckpoint, EarlyStopping
 import pandas as pd
-from scipy.signal import convolve2d
-import custom_loss
+# from scipy.signal import convolve2d
+# import custom_loss
 import generate_training_patches_segmentation
 
+# print("Num GPUs Available: ", len(tf.config.experimental.list_physical_devices('GPU')))
 
-def _get_available_gpus():
-    """Get a list of available gpu devices (formatted as strings).
 
-    # Returns
-        A list of available GPU devices.
-    """
-    #global _LOCAL_DEVICES
-    if K.tensorflow_backend._LOCAL_DEVICES is None:
-        devices = tf.config.list_logical_devices()
-        K.tensorflow_backend._LOCAL_DEVICES = [x.name for x in devices]
-    return [x for x in K.tensorflow_backend._LOCAL_DEVICES if 'device:gpu' in x.lower()]
-
-K.tensorflow_backend._get_available_gpus = _get_available_gpus
-print(K.tensorflow_backend._get_available_gpus())
-# Sample: python generate_tuned_model_v3.py --in_tile_path ../../../media/disk2/datasets/all_maryalnd_naip/  --in_model_path_ae ../landcover-old/web_tool/data/naip_autoencoder.h5  --out_model_path_ae ./naip_autoencoder_tuned.h5 --num_classes 2 --gpu 1 --exp test_run --exp_type single_tile_4000s
+# Sample: python generate_tuned_model_v3.py --in_model_path_ae ./naip_autoencoder.h5  --out_model_path_ae ./naip_autoencoder_tuned.h5 --num_classes 2 --gpu 1 --exp test_run --exp_type single_tile_4000s
 
 def iou_coef(y_true, y_pred, smooth=1):
   intersection = K.sum(K.abs(y_true * y_pred), axis=[1,2,3])
@@ -119,9 +108,9 @@ def get_model(model_path, num_classes):
     toutput = Conv2D(num_classes, (1,1), padding="same", use_bias=True, activation="softmax", name="output_conv")(toutput)
     model = keras.models.Model(inputs=tmodel.inputs, outputs=[toutput])
 
-    optimizer = Adam(lr=0.001)
+    optimizer = Adam(lr=0.0001)
 
-    model.compile(loss=K.categorical_crossentropy, optimizer=optimizer, metrics=[iou_coef])
+    model.compile(loss=K.categorical_crossentropy, optimizer=optimizer, metrics=[iou_coef, tf.keras.metrics.Recall(), tf.keras.metrics.Precision()])
     
     return model
 
@@ -140,32 +129,39 @@ def train_model_from_points(in_model_path_ae, in_tile_path, out_model_path_ae, n
     #  "./binary_raster_md_tif/", 150, 150, 4, 2, 4000, test=True)
 
     # Testing single tile m_3807537_ne
-    # X, Y = generate_training_patches_segmentation.gen_training_patches_center_and_dense_single("../../../media/disk2/datasets/all_maryalnd_naip/",
-    # "./binary_raster_md_tif/", 150, 150, 4, 2, 4000, test=True)
+    X, Y = generate_training_patches_segmentation.gen_training_patches_center_and_dense_single("../../../data/jason/datasets/md_100cm_2017/38075/",
+    "./binary_raster_md_tif/", 150, 150, 4, 2, 4000, test=True)
 
     # Train test split (Takes 3000 for train [1000 from train for validation], Test 1000)
     # x_train, x_test, y_train, y_test = train_test_split(X,Y,train_size=0.75, test_size=0.25, random_state=42)
 
-    X = np.load("./x_dense.npy")
-    Y = np.load("./y_dense.npy")
-    X_val = np.load("./x_dense_val.npy")
-    Y_val = np.load("./y_dense_val.npy")
+    # X = np.load("./x_dense_new.npy")
+    # Y = np.load("./y_dense_new.npy")
+    # X_val = np.load("./x_dense_val.npy")
+    # Y_val = np.load("./y_dense_val.npy")
 
-    cpPath = f"{exp}/{exp_type}/ae_tuned_model_"
+    # Calculate class weights
+    # class_weights = class_weight.compute_class_weight('balanced',np.unique(Y),Y)
+    # class_weight_dict = dict(enumerate(class_weights))
+
+    cpPath = "{}/{}/ae_tuned_model_".format(exp, exp_type)
 
     checkpointer_ae = ModelCheckpoint(filepath=(cpPath+"{epoch:02d}_{loss:.2f}.h5"), monitor='loss', verbose=1)
 
-    es = EarlyStopping(monitor='iou_coef', min_delta=0.05, patience=3)
+    # es = EarlyStopping(monitor='iou_coef', min_delta=0.05, patience=3)
 
     model_ae.fit(
         X, Y,
-        batch_size=10, epochs=10, verbose=1, validation_data=(X_val, Y_val),
-        callbacks=[checkpointer_ae, es]
+        batch_size=10, epochs=50, verbose=1,
+        # validation_data=(X_val, Y_val),
+        callbacks=[checkpointer_ae]
+        # ,
+        # class_weight=class_weight_dict
     )
 
     model_ae.save(out_model_path_ae)
 
-    # print("Testing")
+    print("Testing")
 
     # res = model_ae.evaluate(x_test, y_test)
 
@@ -175,7 +171,7 @@ def main():
     parser = argparse.ArgumentParser(description="Generate a model tuned using webtool")
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose debugging", default=False)
     # Input
-    parser.add_argument("--in_tile_path", action="store", dest="in_tile_path", type=str, help="Path to input tif dir", required=True)
+    parser.add_argument("--in_tile_path", action="store", dest="in_tile_path", type=str, help="Path to input tif dir", required=False)
     # Models
     parser.add_argument("--in_model_path_ae", action="store", dest="in_model_path_ae", type=str, help="Path to unsupervised model that needs retraining", required=True)
     parser.add_argument("--out_model_path_ae", action="store", dest="out_model_path_ae", type=str, help="Output path for tuned unsupervised model", required=True)
@@ -204,3 +200,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# python3 generate_tuned_model_v3.py --in_model_path_ae ./naip_autoencoder.h5  --out_model_path_ae ./naip_autoencoder_tuned.h5 --num_classes 2 --gpu 1 --exp test_run --exp_type single_tile_4000s
