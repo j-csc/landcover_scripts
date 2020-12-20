@@ -93,45 +93,16 @@ def get_loss(mask_value):
         return K.sum(loss) / K.sum(mask)
     return masked_categorical_crossentropy
 
-def get_model(num_classes):
-    # K.clear_session()
-    model = sm.Unet('resnet34', classes = num_classes, activation='softmax')
-
-    optimizer = Adam(lr=0.0001)
-
-    model.compile(loss=K.categorical_crossentropy, optimizer=optimizer, metrics=[iou_coef, tf.keras.metrics.Recall(), tf.keras.metrics.Precision()])
-    
-    return model
-
-def train_model_from_points(num_classes, exp):
+def test_model():
     # UNet tuning
 
     print("Tuning Unet model")
 
-    model = get_model(num_classes)
-    model.summary()
-
-    # Load in sample
-    print("Loading tiles...")
-
-    train_ratio = 0.80
-    validation_ratio = 0.15
-    test_ratio = 0.05
+    # TODO load model
+    model = keras(num_classes)
     
     data_root = "./data/random"
     region = "m_38075"
-
-    train_generator = ChickenDataGenerator(
-        dataset_dir=os.path.join(data_root, region, "train"),
-        batch_size=10,
-        steps_per_epoch=10,
-        )
-    
-    validation_generator = ChickenDataGenerator(
-        dataset_dir=os.path.join(data_root, region, "validation"),
-        batch_size=10,
-        steps_per_epoch=10,
-        )
     
     test_generator = ChickenDataGenerator(
         dataset_dir=os.path.join(data_root, region, "test"),
@@ -139,54 +110,22 @@ def train_model_from_points(num_classes, exp):
         steps_per_epoch=10,
         )
 
-    # dataX, dataY = generate_training_patches.gen_training_patches("../../../data/jason/datasets/md_100cm_2017/38075/",
-    # "./binary_raster_md_tif/", 256, 256, 4, 2, 100000, region="m_38075")
-
-    # Train is now 80% of the entire data set
-    # x_train, x_test, y_train, y_test = train_test_split(dataX, dataY, test_size=1 - train_ratio)
-
-    # test is now 5% of the initial data set
-    # validation is now 15% of the initial data set
-    # x_val, x_test, y_val, y_test = train_test_split(x_test, y_test, test_size=test_ratio/(test_ratio + validation_ratio)) 
-
-    # cpPath = "{}/unet_model_".format(exp)
-
-    # checkpointer_ae = ModelCheckpoint(filepath=(cpPath+"{epoch:02d}_{loss:.2f}.h5"), monitor='loss', verbose=1)
-
-    model.fit(
-        train_generator,
-        # x_train, y_train,
-        # batch_size=10, 
-        epochs=100, verbose=1,
-        validation_data=validation_generator #(x_val, y_val),
-        # callbacks=[checkpointer_ae]
-    )
-    model.save("./unet_model_random.h5")
-
-    # print("Testing")
     score=model.evaluate(iou_coef, test_generator, verbose=2)
     print(score)
 
 def main():
     parser = argparse.ArgumentParser(description="Generate a tuned unet model")
-    parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose debugging", default=False)
-    # Custom
-    parser.add_argument("--num_classes", action="store", dest="num_classes", type=str, help="Number of classes", required=True)
-    parser.add_argument("--gpu", action="store", dest="gpuid", type=int, help="GPU to use", required=True)
-    # Experiment argument
-    parser.add_argument("--exp", action="store",dest="exp", type=str, required=True)
-
     args = parser.parse_args(sys.argv[1:])
     args.batch_size=10
     args.num_epochs=30
 
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-    os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpuid)
+    os.environ["CUDA_VISIBLE_DEVICES"] = str(1)
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = "3"
 
     start_time = float(time.time())
 
-    train_model_from_points(int(args.num_classes), args.exp)
+    test_model()
 
     print("Finished in %0.4f seconds" % (time.time() - start_time))
     

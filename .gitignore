@@ -17,3 +17,6 @@ gd_*
 test_run/
 x_dense*
 y_dense*
+data/
+test_results/
+unet_model_*
