@@ -14,15 +14,17 @@ from tensorflow.keras.preprocessing.image import ImageDataGenerator
 # shuffling data loader
 # train-test split loader
 # check if there is a good dataloader for this (images + labels)
+
 class ChickenDataGenerator(keras.utils.Sequence):
     def __init__(
         self,
         dataset_dir, # e.g. os.path.join(data_root, region, "train")s
         batch_size,
-        steps_per_epoch,
+        steps_per_epoch = None,
+        shuffle=True,
         input_size=256,
         output_size=256,
-        num_channels=3,
+        num_channels=4,
         num_classes=2,
         data_type="uint16",
     ):
@@ -31,7 +33,6 @@ class ChickenDataGenerator(keras.utils.Sequence):
         self.dataset_dir = dataset_dir
 
         self.batch_size = batch_size
-        self.steps_per_epoch = steps_per_epoch
 
         self.input_size = input_size
         self.output_size = output_size
@@ -41,8 +42,12 @@ class ChickenDataGenerator(keras.utils.Sequence):
 
         self.img_names = np.array(list(glob.glob(os.path.join(self.dataset_dir, "img", "*"))))
         self.mask_names = np.array(list(glob.glob(os.path.join(self.dataset_dir, "mask", "*"))))
-        
-        # self.data_type = data_type
+        if steps_per_epoch is not None:
+            self.steps_per_epoch = steps_per_epoch
+        else:
+            self.steps_per_epoch = len(self.img_names)//batch_size # ??? probably handle last batch size    
+
+        self.shuffle = shuffle
 
         self.on_epoch_end()
 
@@ -66,20 +71,21 @@ class ChickenDataGenerator(keras.utils.Sequence):
         )
 
         for i, (img_file, mask_file) in enumerate(zip(img_names, mask_names)):
-            data = np.load(img_file)
+            data = np.load(img_file).squeeze()
             data /= 255.0
-            # data = dl.squeeze()
-            x_batch[i] = data[:,:,:3]
+            x_batch[i] = data[:,:,:self.num_channels]
             mask_data = np.load(mask_file)
             # mask_data = ml.squeeze()
             y_batch[i] = mask_data
             # data = np.rollaxis(data, 0, 3)
+            # print(data.shape)
                       
         return x_batch, y_batch
 
     def on_epoch_end(self):
         self.indices = np.arange(len(self.img_names))
-        np.random.shuffle(self.indices)
+        if self.shuffle:
+            np.random.shuffle(self.indices)
 
 # TODO, dump to data directory, not this directory
 
@@ -181,6 +187,10 @@ def gen_training_patches(x_fns, y_fns, width, height, channel, target, total_num
             
             # FOR DENSE
             mask = target_one_hot[y-(height//2):y+(height//2), x-(width//2):x+(width//2)]
+            # import IPython; import sys; IPython.embed(); sys.exit(1)
+            # mask = target[y-(height//2):y+(height//2), x-(width//2):x+(width//2)]
+            # mask = mask.reshape(width, height, 1)
+
             
             # Dump out img, target_one_hot to file
             partition_name = all_partition_names[count]
@@ -199,7 +209,7 @@ def gen_training_patches(x_fns, y_fns, width, height, channel, target, total_num
             if count % 10000 == 0:
                 print("Iteration: {}".format(count))
 
-    with open("./random_ratio.txt", "w+") as f:
+    with open("./random_ratio_single.txt", "w+") as f:
         f.write("Ratio of chicken house to non-chicken: {}".format(non_zero_count / count))
 
     print("# of chicken house patches: {}".format(non_zero_count))
@@ -340,6 +350,9 @@ def gen_training_patches_balanced(x_fns, y_fns, width, height, channel, target, 
             
             # FOR DENSE
             mask = target_one_hot[y-(height//2):y+(height//2), x-(width//2):x+(width//2)]
+            # mask = target[y-(height//2):y+(height//2), x-(width//2):x+(width//2)]
+            # mask = mask.reshape(width, height, 1)
+
             # y_batches[count] = mask
             # {'train': ['id-1', 'id-2', 'id-3'], 'validation': ['id-4']}
 
@@ -362,7 +375,7 @@ def gen_training_patches_balanced(x_fns, y_fns, width, height, channel, target, 
                 print("Iteration: {}".format(count))
 
     # x_batches /= 255.0
-    with open("./balanced_ratio.txt", "w+") as f:
+    with open("./balanced_ratio_single.txt", "w+") as f:
         f.write("Ratio of chicken house to non-chicken: {}".format(non_zero_count / count))
     # print("Ratio of chicken house to non-chicken: {}".format(non_zero_count / count))
     print("# of chicken house patches: {}".format(non_zero_count))
@@ -376,15 +389,16 @@ def main():
     # os.environ["DATA_DIR"]
     # in .bashrc: export DATA_DIR="asdf"
 
-    data_root = "./data/balanced"
-    # random_data_root = "./data/random"
+    data_root = "../../../data/jason/gen_data/balanced"
+    random_data_root = "../../../data/jason/gen_datas/random"
+    
     region = "m_38075"
-    # gen_training_patches("../../../media/data/datasets/md/md_100cm_2017/38075/",
-    #  "./binary_raster_md_tif/", 256, 256, 4, 2, 100000, region="m_38075", output_root=random_data_root, pct_train=0.80, pct_validation=0.15, seed=42)
+    gen_training_patches("../../../data/jason/datasets/md_100cm_2017/38075/",
+     "./binary_raster_md_tif/", 256, 256, 4, 2, 640, region="m_3807537_nw", output_root=data_root, pct_train=0.80, pct_validation=0.15, seed=42)
 
 
-    gen_training_patches_balanced("../../../media/data/datasets/md/md_100cm_2017/38075/",
-     "./binary_raster_md_tif/", 256, 256, 4, 2, 100000, region="m_38075", output_root=data_root, pct_train=0.80, pct_validation=0.15, seed=42)
+    gen_training_patches_balanced("../../../data/jason/datasets/md_100cm_2017/38075/",
+     "./binary_raster_md_tif/", 256, 256, 4, 2, 640, region="m_3807537_nw", output_root=data_root, pct_train=0.80, pct_validation=0.15, seed=42)
 
  
     # we create two instances with the same arguments
@@ -393,9 +407,9 @@ def main():
     #     dataset_dir=os.path.join(data_root, region, "train"),
     #     batch_size=2,
     #     steps_per_epoch=2,
-    #     )
+        # )   
 
-    
+    # import IPython; import sys; IPython.embed(); sys.exit(1)
     pass
 
 if __name__ == "__main__":

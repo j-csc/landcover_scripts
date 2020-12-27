@@ -65,10 +65,11 @@ import generate_training_patches
 # Sample: python generate_tuned_model_v3.py --in_model_path_ae ./naip_autoencoder.h5  --out_model_path_ae ./naip_autoencoder_tuned.h5 --num_classes 2 --gpu 1 --exp test_run --exp_type single_tile_4000s
 
 def iou_coef(y_true, y_pred, smooth=1):
-  intersection = K.sum(K.abs(y_true * y_pred), axis=[1,2,3])
-  union = K.sum(y_true,[1,2,3])+K.sum(y_pred,[1,2,3])-intersection
-  iou = K.mean((intersection + smooth) / (union + smooth), axis=0)
-  return iou
+    # import IPython; import sys; IPython.embed(); sys.exit(1)
+    intersection = K.sum(K.abs(y_true * y_pred), axis=[1,2,3])
+    union = K.sum(y_true,[1,2,3])+K.sum(y_pred,[1,2,3])-intersection
+    iou = K.mean((intersection + smooth) / (union + smooth), axis=0)
+    return iou
 
 def masked_categorical_crossentropy(y_true, y_pred):
     
@@ -95,11 +96,17 @@ def get_loss(mask_value):
 
 def get_model(num_classes):
     # K.clear_session()
-    model = sm.Unet('resnet34', classes = num_classes, activation='softmax')
+    model = sm.Unet(input_shape=(None,None,4), classes = 2, activation='softmax', encoder_weights=None)
 
     optimizer = Adam(lr=0.0001)
 
-    model.compile(loss=K.categorical_crossentropy, optimizer=optimizer, metrics=[iou_coef, tf.keras.metrics.Recall(), tf.keras.metrics.Precision()])
+    metrics = [sm.metrics.IOUScore(class_indexes=1), sm.metrics.FScore(beta=1), sm.metrics.Precision(class_indexes=1), sm.metrics.Recall(class_indexes=1)]
+
+    # jaccardLoss = sm.losses.JaccardLoss(class_indexes=1)
+    bceLoss = sm.losses.BinaryCELoss()
+    # lossFx = jaccardLoss + cceLoss
+
+    model.compile(loss=sm.losses.bceLoss, optimizer=optimizer, metrics=metrics)
     
     return model
 
@@ -117,54 +124,48 @@ def train_model_from_points(num_classes, exp):
     train_ratio = 0.80
     validation_ratio = 0.15
     test_ratio = 0.05
-    
-    data_root = "./data/random"
-    region = "m_38075"
+
+    # gen is 1d binary classification, gen_data is one hot encoded -> [0 1]
+    data_root = "../../../data/jason/gen_data/balanced"
+    data_random_root = "../../../data/jason/gen_data/random"
+    region = "m_3807537_nw"
 
     train_generator = ChickenDataGenerator(
         dataset_dir=os.path.join(data_root, region, "train"),
-        batch_size=10,
-        steps_per_epoch=10,
+        batch_size=8,
+        steps_per_epoch=None,
+        shuffle=True
         )
     
     validation_generator = ChickenDataGenerator(
         dataset_dir=os.path.join(data_root, region, "validation"),
-        batch_size=10,
-        steps_per_epoch=10,
+        batch_size=8,
+        steps_per_epoch=None,
+        shuffle=True
         )
     
     test_generator = ChickenDataGenerator(
-        dataset_dir=os.path.join(data_root, region, "test"),
-        batch_size=10,
-        steps_per_epoch=10,
+        dataset_dir=os.path.join(data_random_root, region, "test"),
+        batch_size=8,
+        steps_per_epoch=None,
+        shuffle=False
         )
-
-    # dataX, dataY = generate_training_patches.gen_training_patches("../../../data/jason/datasets/md_100cm_2017/38075/",
-    # "./binary_raster_md_tif/", 256, 256, 4, 2, 100000, region="m_38075")
-
-    # Train is now 80% of the entire data set
-    # x_train, x_test, y_train, y_test = train_test_split(dataX, dataY, test_size=1 - train_ratio)
-
-    # test is now 5% of the initial data set
-    # validation is now 15% of the initial data set
-    # x_val, x_test, y_val, y_test = train_test_split(x_test, y_test, test_size=test_ratio/(test_ratio + validation_ratio)) 
-
-    # cpPath = "{}/unet_model_".format(exp)
-
-    # checkpointer_ae = ModelCheckpoint(filepath=(cpPath+"{epoch:02d}_{loss:.2f}.h5"), monitor='loss', verbose=1)
+    
+    es = EarlyStopping(monitor='iou_score', min_delta=0.05, patience=2)
+    # import IPython; import sys; IPython.embed(); sys.exit(1)
 
     model.fit(
         train_generator,
-        # x_train, y_train,
-        # batch_size=10, 
         epochs=100, verbose=1,
-        validation_data=validation_generator #(x_val, y_val),
-        # callbacks=[checkpointer_ae]
+        validation_data=validation_generator,
+        callbacks=[
+        keras.callbacks.ModelCheckpoint('./best_mode_m38075_single_balanced.h5', save_weights_only=True, save_best_only=True, mode='min')]
     )
-    model.save("./unet_model_random.h5")
+
+    model.save("./unet_model_m38075_balanced.h5")
 
     # print("Testing")
-    score=model.evaluate(iou_coef, test_generator, verbose=2)
+    score=model.evaluate(test_generator, verbose=2)
     print(score)
 
 def main():

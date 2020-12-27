@@ -93,7 +93,7 @@ def main():
     # Batch run inference
     # fn_folders = glob.glob("../../../media/disk1/datasets/delaware_data/de_100cm_2017/*") # Delaware
     
-    fn_folders = glob.glob("../../../media/data/datasets/md/md_100cm_2017/38075/*.tif") # MD
+    fn_folders = glob.glob("../../../data/jason/datasets/md_100cm_2017/38075/*.tif") # MD
     
     all_fns = []
     for fn_folder in fn_folders:

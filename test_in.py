@@ -42,6 +42,16 @@ print(tf.__version__)
 print("Num GPUs Available: ", len(tf.config.experimental.list_physical_devices('GPU')))
 
 import time
+from keras.optimizers import SGD, Adam, RMSprop, Adadelta
+from keras.layers import Input, Dense, Activation, MaxPooling2D, Conv2D, BatchNormalization
+from keras.layers import Concatenate, Cropping2D, Lambda
+from keras.losses import categorical_crossentropy, binary_crossentropy
+from keras.preprocessing.image import ImageDataGenerator
+from keras.callbacks import ModelCheckpoint, EarlyStopping
+import pandas as pd
+import segmentation_models as sm
+
+
 import subprocess
 import datetime
 import argparse
@@ -55,7 +65,6 @@ import rasterio
 import keras
 import keras.backend as K
 import segmentation_models as sm
-
 
 def run_model_on_tile(model, naip_tile, inpt_size, output_size, batch_size):
     down_weight_padding = 40
@@ -86,13 +95,12 @@ def run_model_on_tile(model, naip_tile, inpt_size, output_size, batch_size):
 
     model_output = model.predict(np.array(batch), batch_size=batch_size, verbose=0)
 
-    import IPython; import sys; IPython.embed(); sys.exit(1)
+
     for i, (y, x) in enumerate(batch_indices):
         output[y:y+inpt_size, x:x+inpt_size] += model_output[i] * kernel[..., np.newaxis]
         counts[y:y+inpt_size, x:x+inpt_size] += kernel
 
     return output / counts[..., np.newaxis]
-
 
 #---------------------------------------------------------------------------------------------------
 #---------------------------------------------------------------------------------------------------
@@ -117,6 +125,22 @@ def do_args(arg_list, name):
     )
 
     return parser.parse_args(arg_list)
+
+def get_model(num_classes):
+    # K.clear_session()
+    model = sm.Unet(input_shape=(None,None,4), classes = 1, activation='sigmoid', encoder_weights=None)
+
+    optimizer = Adam(lr=0.0001)
+
+    metrics = [sm.metrics.IOUScore(smooth=1e-05), sm.metrics.FScore(beta=1), sm.metrics.Precision(), sm.metrics.Recall()]
+
+    # jaccardLoss = sm.losses.JaccardLoss(class_indexes=1)
+    bceLoss = sm.losses.BinaryCELoss()
+    # lossFx = jaccardLoss + cceLoss
+
+    model.compile(loss=bceLoss, optimizer=optimizer, metrics=metrics)
+    
+    return model
 
 def main():
     program_name = "Model inference script"
@@ -147,11 +171,16 @@ def main():
         'f1-score': keras.metrics.mean_squared_error,
         'precision': keras.metrics.mean_squared_error,
         'recall': keras.metrics.mean_squared_error,
+        'categorical_crossentropy_plus_jaccard_loss': keras.metrics.mean_squared_error,
     })
+
+    # model = get_model(1)
+    # model.load_weights(model_fn)
 
     output_shape = model.output_shape[1:]
     input_shape = model.input_shape[1:]
     model_input_size = input_shape[0]
+
     assert len(model.outputs) == 1, "The loaded model has multiple outputs."
 
     print("Expected input shape: %s" % (str(input_shape)))
@@ -169,31 +198,9 @@ def main():
         curr_tile = np.rollaxis(curr_tile, 0, 3)
         curr_fid.close()
 
-        output = run_model_on_tile(model, curr_tile, 256, 256, 16)
+        print(curr_tile.shape)
 
-        #----------------------------------------------------------------
-        # Write out each softmax prediction to a separate file
-        #----------------------------------------------------------------
-        
-        if save_probabilities:
-            t_output_fn = "test_prob.tif"
-            current_profile = curr_profile.copy()
-            current_profile['driver'] = 'GTiff'
-            current_profile['dtype'] = 'uint8'
-            current_profile['count'] = 2 # TODO: This assumes that there are 5 outputs, fix this
-            current_profile['compress'] = "lzw"
-
-            # quantize the probabilities
-            bins = np.arange(256)
-            bins = bins / 255.0
-            output = np.digitize(output, bins=bins, right=True).astype(np.uint8)
-
-            f = rasterio.open(t_output_fn, 'w', **current_profile)
-            f.write(output[:,:,0], 1) # TODO: This assumes that there are 5 outputs, fix this
-            f.write(output[:,:,1], 2) # TODO: This assumes that there are 5 outputs, fix this
-            # f.write(output[:,:,2], 3) # TODO: This assumes that there are 5 outputs, fix this
-
-            f.close()
+        output = run_model_on_tile(model, curr_tile, 256, 2, 16)
 
         #----------------------------------------------------------------
         # Write out the class predictions
@@ -216,3 +223,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# m_3807537_nw_18_1_20170611.tif

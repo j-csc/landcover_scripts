@@ -51,6 +51,7 @@ import tensorflow.keras.backend as K
 import keras.callbacks
 import keras.utils
 import tensorflow as tf
+from keras.models import load_model
 from keras.optimizers import SGD, Adam, RMSprop, Adadelta
 from keras.layers import Input, Dense, Activation, MaxPooling2D, Conv2D, BatchNormalization
 from keras.layers import Concatenate, Cropping2D, Lambda
@@ -96,31 +97,49 @@ def get_loss(mask_value):
 def test_model():
     # UNet tuning
 
-    print("Tuning Unet model")
+    print("Test Unet model")
+    np.random.seed(42)
 
     # TODO load model
-    model = keras(num_classes)
+    model = load_model('./unet_model_random.h5', custom_objects={"iou_coef": iou_coef})
     
-    data_root = "./data/random"
+    data_root = "../../../data/jason/gen/random"
     region = "m_38075"
     
     test_generator = ChickenDataGenerator(
         dataset_dir=os.path.join(data_root, region, "test"),
         batch_size=10,
-        steps_per_epoch=10,
-        )
-
-    score=model.evaluate(iou_coef, test_generator, verbose=2)
-    print(score)
+        shuffle=False,
+        # steps_per_epoch=10, # currently total number of examples is steps*batch_size=100, maybe eliminate this in chicken test generator
+    )
+    
+    # all_preds = []
+    # all_labels = []
+    # for x, y in test_generator:
+    #     all_preds.append(model(x)[:,:,1] > 0.5)
+    #     all_labels.append(y[:,:,1])
+    
+    # # model.evaluate(all_labels, all_preds, batch_size=10)    
+    # y_true = np.concat(all_labels)
+    # y_pred = np.concat(all_preds)
+    # from sklearn import metrics
+    # recall = metrics.recall_score(y_true, y_pred)
+    # precision = metrics.precision_score(y_true, y_pred)
+    # print("recall:", recall, "precision", precision)
+        
+    # res = model.evaluate(test_generator, verbose=2, return_dict=True)
+    # print(res)
+    y_pred = model.predict(test_generator, verbose=2)
+    import IPython; import sys; IPython.embed(); sys.exit(1)
+    # print(score)
 
 def main():
     parser = argparse.ArgumentParser(description="Generate a tuned unet model")
     args = parser.parse_args(sys.argv[1:])
-    args.batch_size=10
-    args.num_epochs=30
+    # parser.add_argument("--gpu", action="store", dest="gpuid", type=int, help="GPU to use", required=True)
 
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-    os.environ["CUDA_VISIBLE_DEVICES"] = str(1)
+    os.environ["CUDA_VISIBLE_DEVICES"] = str(2)
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = "3"
 
     start_time = float(time.time())
