@@ -225,3 +225,5 @@ if __name__ == "__main__":
     main()
 
 # m_3807537_nw_18_1_20170611.tif
+
+# python3 test_in.py --input_fns ../../../data/jason/datasets/md_100cm_2017/38075/m_3807537_nw_18_1_20170611.tif --output_fns ./test_random.tif --model unet_model_exp1_random.h5

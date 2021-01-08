@@ -6,6 +6,7 @@ import keras.utils
 import os
 from PIL import Image
 import scipy.misc
+import wandb
 
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 
@@ -15,13 +16,14 @@ from tensorflow.keras.preprocessing.image import ImageDataGenerator
 # train-test split loader
 # check if there is a good dataloader for this (images + labels)
 
+
 class ChickenDataGenerator(keras.utils.Sequence):
     def __init__(
         self,
-        dataset_dir, # e.g. os.path.join(data_root, region, "train")s
+        dataset_dir, # e.g. os.path.join(data_root, region, "train")
         batch_size,
         steps_per_epoch = None,
-        shuffle=True,
+        shuffle=False,
         input_size=256,
         output_size=256,
         num_channels=4,
@@ -40,8 +42,9 @@ class ChickenDataGenerator(keras.utils.Sequence):
         self.num_channels = num_channels
         self.num_classes = num_classes
 
-        self.img_names = np.array(list(glob.glob(os.path.join(self.dataset_dir, "img", "*"))))
-        self.mask_names = np.array(list(glob.glob(os.path.join(self.dataset_dir, "mask", "*"))))
+        self.img_names = np.array(sorted(list(glob.glob(os.path.join(self.dataset_dir, "img", "*")))))
+        self.mask_names = np.array(sorted(list(glob.glob(os.path.join(self.dataset_dir, "mask", "*")))))
+
         if steps_per_epoch is not None:
             self.steps_per_epoch = steps_per_epoch
         else:
@@ -50,7 +53,6 @@ class ChickenDataGenerator(keras.utils.Sequence):
         self.shuffle = shuffle
 
         self.on_epoch_end()
-
 
     def __len__(self):
         """Denotes the number of batches per epoch"""
@@ -75,11 +77,8 @@ class ChickenDataGenerator(keras.utils.Sequence):
             data /= 255.0
             x_batch[i] = data[:,:,:self.num_channels]
             mask_data = np.load(mask_file)
-            # mask_data = ml.squeeze()
             y_batch[i] = mask_data
-            # data = np.rollaxis(data, 0, 3)
-            # print(data.shape)
-                      
+
         return x_batch, y_batch
 
     def on_epoch_end(self):
@@ -105,19 +104,12 @@ def gen_training_patches(x_fns, y_fns, width, height, channel, target, total_num
     """
 
     np.random.seed(seed)
-    
+
     # Output
-    # x_batches = np.zeros((total_num_samples, width, height, channel), dtype=np.float32)
-    # y_batches = np.zeros((total_num_samples, width, height, target))
-    # print(x_batches.shape, y_batches.shape)
-
-    # TODO use pathlib
-    ground_truth_set = glob.glob(os.path.join(y_fns, "*"))
-
-        # Output
     output_data_dir = os.path.join(output_root, region)
-    # if not os.path.exists(output_data_dir):
-    # os.makedirs(output_data_dir, exist_ok=True)
+    if not os.path.exists(output_data_dir):
+        os.makedirs(output_data_dir, exist_ok=True)
+
     for partition_name in ["train", "validation", "test"]:
         os.makedirs(os.path.join(output_data_dir, partition_name, "img"), exist_ok=True)
         os.makedirs(os.path.join(output_data_dir, partition_name, "mask"), exist_ok=True)
@@ -131,9 +123,9 @@ def gen_training_patches(x_fns, y_fns, width, height, channel, target, total_num
         *['test' for i in range(num_test)]
         ]
     np.random.shuffle(all_partition_names)
-    # partition_name = np.random.choice(['train', 'validation', 'test'], weights=[pct_train, pct_validation, 1-pct_train - pct_val])
         
     ground_truth_set = glob.glob(y_fns + "*")
+
     ground_truth_set = [x for x in ground_truth_set if region in x]
 
     count = 0
@@ -145,7 +137,7 @@ def gen_training_patches(x_fns, y_fns, width, height, channel, target, total_num
         y_fn = np.random.choice(ground_truth_set)
         folder_name = y_fn.split('/')[2][2:7]
         filename = y_fn.split('/')[2][:26]
-        x_fn = x_fns + filename + ".tif"
+        x_fn = x_fns + f"/{folder_name}/" + filename + ".tif"
         # print(x_fn)
 
         # Load input file
@@ -153,7 +145,6 @@ def gen_training_patches(x_fns, y_fns, width, height, channel, target, total_num
         data = f.read().squeeze()
         data = np.rollaxis(data, 0, 3)
         f.close()
-        # print(data.shape)
 
         # Load ground truth file
         f = rasterio.open(y_fn, "r")
@@ -187,11 +178,7 @@ def gen_training_patches(x_fns, y_fns, width, height, channel, target, total_num
             
             # FOR DENSE
             mask = target_one_hot[y-(height//2):y+(height//2), x-(width//2):x+(width//2)]
-            # import IPython; import sys; IPython.embed(); sys.exit(1)
-            # mask = target[y-(height//2):y+(height//2), x-(width//2):x+(width//2)]
-            # mask = mask.reshape(width, height, 1)
 
-            
             # Dump out img, target_one_hot to file
             partition_name = all_partition_names[count]
             img_file = os.path.join(output_data_dir, partition_name, 'img', f"img_{count}")
@@ -209,11 +196,8 @@ def gen_training_patches(x_fns, y_fns, width, height, channel, target, total_num
             if count % 10000 == 0:
                 print("Iteration: {}".format(count))
 
-    with open("./random_ratio_single.txt", "w+") as f:
+    with open(f"./random_ratio_{region}.txt", "w+") as f:
         f.write("Ratio of chicken house to non-chicken: {}".format(non_zero_count / count))
-
-    print("# of chicken house patches: {}".format(non_zero_count))
-    # return x_batches, y_batches
 
 
 # TODO, dump to data directory, not this directory
@@ -237,8 +221,8 @@ def gen_training_patches_balanced(x_fns, y_fns, width, height, channel, target, 
 
     # Output
     output_data_dir = os.path.join(output_root, region)
-    # if not os.path.exists(output_data_dir):
-    # os.makedirs(output_data_dir, exist_ok=True)
+    if not os.path.exists(output_data_dir):
+        os.makedirs(output_data_dir, exist_ok=True)
     for partition_name in ["train", "validation", "test"]:
         os.makedirs(os.path.join(output_data_dir, partition_name, "img"), exist_ok=True)
         os.makedirs(os.path.join(output_data_dir, partition_name, "mask"), exist_ok=True)
@@ -252,7 +236,6 @@ def gen_training_patches_balanced(x_fns, y_fns, width, height, channel, target, 
         *['test' for i in range(num_test)]
         ]
     np.random.shuffle(all_partition_names)
-    # partition_name = np.random.choice(['train', 'validation', 'test'], weights=[pct_train, pct_validation, 1-pct_train - pct_val])
         
     ground_truth_set = glob.glob(y_fns + "*")
     ground_truth_set = [x for x in ground_truth_set if region in x]
@@ -266,8 +249,8 @@ def gen_training_patches_balanced(x_fns, y_fns, width, height, channel, target, 
         y_fn = np.random.choice(ground_truth_set)
         folder_name = y_fn.split('/')[2][2:7]
         filename = y_fn.split('/')[2][:26]
-        x_fn = x_fns + filename + ".tif"
-        # print(x_fn)
+        x_fn = x_fns + f"/{folder_name}/" + filename + ".tif"
+        print(x_fn)
 
         # Load input file
         f = rasterio.open(x_fn, "r")
@@ -288,18 +271,6 @@ def gen_training_patches_balanced(x_fns, y_fns, width, height, channel, target, 
 
         # Poultry pixels
         y_ind,x_ind = np.where(target==1)
-        # # if this is false, problem
-        # if (len(x_ind) != 0):
-        #     x_out_of_bound = (x_ind - width >= 0) | (x_ind + width < data.shape[1])
-        #     y_out_of_bound = (y_ind - height >= 0) | (y_ind + height < data.shape[0])
-        #     out_of_bounds = x_out_of_bound | y_out_of_bound
-        #     y_ind = y_ind[~out_of_bounds]
-        #     x_ind = x_ind[~out_of_bounds]
-        #     files_wo_chicken_houses = 0
-        # else:
-        #     if files_wo_chicken_houses > 5:
-        #         continue
-        #     files_wo_chicken_houses += 1
 
         # TODO if too many len(x_ind) == 0, keep loading files
 
@@ -338,23 +309,10 @@ def gen_training_patches_balanced(x_fns, y_fns, width, height, channel, target, 
             # Set up x_batch with img data at y,x coords
             img = data[y-(height//2):y+(height//2), x-(width//2):x+(width//2), :].astype(np.float32)
 
-            # remove this
-            # x_batches[count] = img
-
-            # 256 x 256 x (4 + 2)
-            # data = np.random.randint(0, 255, (10,10)).astype(np.uint8)
-            # im = Image.fromarray(data)
-            # im.save('test.tif')
-
             # TODO store img in file for count
             
             # FOR DENSE
             mask = target_one_hot[y-(height//2):y+(height//2), x-(width//2):x+(width//2)]
-            # mask = target[y-(height//2):y+(height//2), x-(width//2):x+(width//2)]
-            # mask = mask.reshape(width, height, 1)
-
-            # y_batches[count] = mask
-            # {'train': ['id-1', 'id-2', 'id-3'], 'validation': ['id-4']}
 
             partition_name = all_partition_names[count]
             img_file = os.path.join(output_data_dir, partition_name, 'img', f"img_{count}")
@@ -365,8 +323,6 @@ def gen_training_patches_balanced(x_fns, y_fns, width, height, channel, target, 
             # TODO store y_batches in mask file for count
 
             if (len(np.unique(mask, axis=0, return_counts=True)[1]) >= 2):
-                # print(len(x_ind))
-                # print(np.unique(y_batches[count], axis=0, return_counts=True)[0])
                 non_zero_count += 1
             
             count += 1
@@ -375,7 +331,7 @@ def gen_training_patches_balanced(x_fns, y_fns, width, height, channel, target, 
                 print("Iteration: {}".format(count))
 
     # x_batches /= 255.0
-    with open("./balanced_ratio_single.txt", "w+") as f:
+    with open(f"./balanced_ratio_{region}.txt", "w+") as f:
         f.write("Ratio of chicken house to non-chicken: {}".format(non_zero_count / count))
     # print("Ratio of chicken house to non-chicken: {}".format(non_zero_count / count))
     print("# of chicken house patches: {}".format(non_zero_count))
@@ -386,21 +342,16 @@ def gen_training_patches_balanced(x_fns, y_fns, width, height, channel, target, 
 
 def main():
     # Sample 50k patches of 240x240 images
-    # os.environ["DATA_DIR"]
-    # in .bashrc: export DATA_DIR="asdf"
-
     data_root = "../../../data/jason/gen_data/balanced"
-    random_data_root = "../../../data/jason/gen_datas/random"
-    
+    random_data_root = "../../../data/jason/gen_data/random"
     region = "m_38075"
-    gen_training_patches("../../../data/jason/datasets/md_100cm_2017/38075/",
-     "./binary_raster_md_tif/", 256, 256, 4, 2, 640, region="m_3807537_nw", output_root=data_root, pct_train=0.80, pct_validation=0.15, seed=42)
+    
+    gen_training_patches("../../../data/jason/datasets/md_100cm_2017",
+     "./binary_raster_md_tif/", 256, 256, 4, 2, 100000, region=region, output_root=random_data_root, pct_train=0.80, pct_validation=0.15, seed=42)
 
+    gen_training_patches_balanced("../../../data/jason/datasets/md_100cm_2017",
+     "./binary_raster_md_tif/", 256, 256, 4, 2, 100000, region=region, output_root=data_root, pct_train=0.80, pct_validation=0.15, seed=42)
 
-    gen_training_patches_balanced("../../../data/jason/datasets/md_100cm_2017/38075/",
-     "./binary_raster_md_tif/", 256, 256, 4, 2, 640, region="m_3807537_nw", output_root=data_root, pct_train=0.80, pct_validation=0.15, seed=42)
-
- 
     # we create two instances with the same arguments
 
     # train_generator = ChickenDataGenerator(

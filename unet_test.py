@@ -36,6 +36,20 @@ def parse_args(args, key):
                 if is_int(args[i+1]):
                     return args[i+1]
     return None
+
+def do_args(arg_list, name):
+    parser = argparse.ArgumentParser(description=name)
+
+    parser.add_argument("--model", action="store", dest="model_fn", type=str, required=True, \
+        help="Path to Keras .h5 model file to use"
+    )
+    
+    parser.add_argument("--gpu", action="store", dest="gpu", type=int, required=False, \
+        help="GPU id to use",
+    )
+
+    return parser.parse_args(arg_list)
+
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 GPU_ID = parse_args(sys.argv, "--gpu")
 if GPU_ID is not None: # if we passed `--gpu INT`, then set the flag, else don't
@@ -71,6 +85,22 @@ def iou_coef(y_true, y_pred, smooth=1):
   iou = K.mean((intersection + smooth) / (union + smooth), axis=0)
   return iou
 
+def get_model():
+    # K.clear_session()
+    model = sm.Unet(input_shape=(None,None,4), classes = 2, activation='softmax', encoder_weights=None)
+
+    optimizer = Adam(lr=0.0001)
+
+    metrics = [sm.metrics.IOUScore(class_indexes=1), sm.metrics.FScore(beta=1), sm.metrics.Precision(class_indexes=1), sm.metrics.Recall(class_indexes=1)]
+
+    # jaccardLoss = sm.losses.JaccardLoss(class_indexes=1)
+    bceLoss = sm.losses.BinaryCELoss()
+    # lossFx = jaccardLoss + cceLoss
+
+    model.compile(loss=bceLoss, optimizer=optimizer, metrics=metrics)
+    
+    return model
+
 def masked_categorical_crossentropy(y_true, y_pred):
     
     mask = K.all(K.equal(y_true, [1,0,0,0,0,0]), axis=-1)
@@ -94,57 +124,60 @@ def get_loss(mask_value):
         return K.sum(loss) / K.sum(mask)
     return masked_categorical_crossentropy
 
-def test_model():
+def test_model(model_fn):
     # UNet tuning
 
     print("Test Unet model")
     np.random.seed(42)
 
     # TODO load model
-    model = load_model('./unet_model_random.h5', custom_objects={"iou_coef": iou_coef})
+
+    model = get_model()
+    model.load_weights(model_fn)
+    model.summary()
+
+    # model = keras.models.load_model(model_fn, custom_objects={
+    #     "jaccard_loss":keras.metrics.mean_squared_error,
+    #     "loss":keras.metrics.mean_squared_error,
+    #     "masked_categorical_crossentropy":keras.metrics.mean_squared_error,
+    #     "custom_loss_fn": keras.metrics.mean_squared_error,
+    #     "iou_coef": keras.metrics.mean_squared_error,
+    #     "iou_score": sm.metrics.IOUScore(),
+    #     'f1-score': keras.metrics.mean_squared_error,
+    #     'precision': keras.metrics.mean_squared_error,
+    #     'recall': keras.metrics.mean_squared_error,
+    #     'categorical_crossentropy_plus_jaccard_loss': keras.metrics.mean_squared_error,
+    # })
     
-    data_root = "../../../data/jason/gen/random"
+    data_root = "../../../data/jason/gen_data/random"
     region = "m_38075"
     
     test_generator = ChickenDataGenerator(
         dataset_dir=os.path.join(data_root, region, "test"),
         batch_size=10,
-        shuffle=False,
-        # steps_per_epoch=10, # currently total number of examples is steps*batch_size=100, maybe eliminate this in chicken test generator
+        shuffle=False
     )
+
+    print("Evaluating")
+    score = model.evaluate(test_generator, verbose=3)
+    print(score)
+    # import IPython; import sys; IPython.embed(); sys.exit(1)
     
-    # all_preds = []
-    # all_labels = []
-    # for x, y in test_generator:
-    #     all_preds.append(model(x)[:,:,1] > 0.5)
-    #     all_labels.append(y[:,:,1])
-    
-    # # model.evaluate(all_labels, all_preds, batch_size=10)    
-    # y_true = np.concat(all_labels)
-    # y_pred = np.concat(all_preds)
-    # from sklearn import metrics
-    # recall = metrics.recall_score(y_true, y_pred)
-    # precision = metrics.precision_score(y_true, y_pred)
-    # print("recall:", recall, "precision", precision)
-        
-    # res = model.evaluate(test_generator, verbose=2, return_dict=True)
-    # print(res)
-    y_pred = model.predict(test_generator, verbose=2)
-    import IPython; import sys; IPython.embed(); sys.exit(1)
-    # print(score)
 
 def main():
     parser = argparse.ArgumentParser(description="Generate a tuned unet model")
-    args = parser.parse_args(sys.argv[1:])
-    # parser.add_argument("--gpu", action="store", dest="gpuid", type=int, help="GPU to use", required=True)
+    args = do_args(sys.argv[1:], "Test")
+    
+    model_fn = args.model_fn
+
 
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-    os.environ["CUDA_VISIBLE_DEVICES"] = str(2)
+    os.environ["CUDA_VISIBLE_DEVICES"] = str(3)
     os.environ['TF_CPP_MIN_LOG_LEVEL'] = "3"
 
     start_time = float(time.time())
 
-    test_model()
+    test_model(model_fn=model_fn)
 
     print("Finished in %0.4f seconds" % (time.time() - start_time))
     
@@ -153,4 +186,3 @@ def main():
 if __name__ == "__main__":
     main()
 
-# python3 generate_unet_model.py --num_classes 2 --gpu 1 --exp unet_test

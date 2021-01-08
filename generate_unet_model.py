@@ -19,6 +19,11 @@ from sklearn.utils import class_weight
 
 from generate_training_patches import ChickenDataGenerator
 
+# import wandb
+# from wandb.keras import WandbCallback
+# wandb.init(project="chicken", entity="chisanch")
+
+
 # Here we look through the args to find which GPU we should use
 # We must do this before importing keras, which is super hacky
 # See: https://stackoverflow.com/questions/40690598/can-keras-with-tensorflow-backend-be-forced-to-use-cpu-or-gpu-at-will
@@ -106,7 +111,7 @@ def get_model(num_classes):
     bceLoss = sm.losses.BinaryCELoss()
     # lossFx = jaccardLoss + cceLoss
 
-    model.compile(loss=sm.losses.bceLoss, optimizer=optimizer, metrics=metrics)
+    model.compile(loss=bceLoss, optimizer=optimizer, metrics=metrics)
     
     return model
 
@@ -126,43 +131,44 @@ def train_model_from_points(num_classes, exp):
     test_ratio = 0.05
 
     # gen is 1d binary classification, gen_data is one hot encoded -> [0 1]
-    data_root = "../../../data/jason/gen_data/balanced"
+    data_root = "../../../data/jason/gen_data/random"
     data_random_root = "../../../data/jason/gen_data/random"
-    region = "m_3807537_nw"
+    region = "all"
 
     train_generator = ChickenDataGenerator(
         dataset_dir=os.path.join(data_root, region, "train"),
-        batch_size=8,
+        batch_size=32,
         steps_per_epoch=None,
         shuffle=True
         )
     
     validation_generator = ChickenDataGenerator(
         dataset_dir=os.path.join(data_root, region, "validation"),
-        batch_size=8,
+        batch_size=32,
         steps_per_epoch=None,
         shuffle=True
         )
     
     test_generator = ChickenDataGenerator(
         dataset_dir=os.path.join(data_random_root, region, "test"),
-        batch_size=8,
+        batch_size=32,
         steps_per_epoch=None,
         shuffle=False
         )
-    
-    es = EarlyStopping(monitor='iou_score', min_delta=0.05, patience=2)
+    # import IPython; import sys; IPython.embed(); sys.exit(1)
+    es = EarlyStopping(monitor='iou_score', min_delta=0.005, patience=2)
     # import IPython; import sys; IPython.embed(); sys.exit(1)
 
-    model.fit(
+    model.fit_generator(
         train_generator,
         epochs=100, verbose=1,
         validation_data=validation_generator,
+        workers=16,
         callbacks=[
-        keras.callbacks.ModelCheckpoint('./best_mode_m38075_single_balanced.h5', save_weights_only=True, save_best_only=True, mode='min')]
+        keras.callbacks.ModelCheckpoint('./best_mode_exp4_all_random.h5', save_weights_only=True, save_best_only=True, mode='min')]
     )
 
-    model.save("./unet_model_m38075_balanced.h5")
+    model.save("./unet_model_exp4_random.h5")
 
     # print("Testing")
     score=model.evaluate(test_generator, verbose=2)
