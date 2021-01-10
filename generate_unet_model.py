@@ -16,6 +16,7 @@ import fiona
 import fiona.transform
 from sklearn.model_selection import train_test_split
 from sklearn.utils import class_weight
+import pickle
 
 from generate_training_patches import ChickenDataGenerator
 
@@ -99,7 +100,7 @@ def get_loss(mask_value):
         return K.sum(loss) / K.sum(mask)
     return masked_categorical_crossentropy
 
-def get_model(num_classes):
+def get_model():
     # K.clear_session()
     model = sm.Unet(input_shape=(None,None,4), classes = 2, activation='softmax', encoder_weights=None)
 
@@ -116,12 +117,12 @@ def get_model(num_classes):
     return model
 
 # Train_type: random or balanced, region: m_38075, exp2 - 4 
-def train_model_from_points(num_classes, train_type, region):
+def train_model_from_points(train_type, region):
     # UNet tuning
 
     print("Tuning Unet model")
 
-    model = get_model(num_classes)
+    model = get_model()
     model.summary()
 
     # Load in sample
@@ -156,37 +157,44 @@ def train_model_from_points(num_classes, train_type, region):
         shuffle=False
         )
     
-    es = EarlyStopping(monitor='iou_score', min_delta=0.0005, patience=2)
+    # es = EarlyStopping(monitor='iou_score', min_delta=0, patience=2)
 
-    cpPath = f"{region}_exp/{train_type}/unet_model_"
+    cpPath = f"{region}_exp/{train_type}/"
 
-    bestmodelPath = f"./best_mode_{region}_{train_type}.h5"
+    if not os.path.exists(cpPath):
+        os.makedirs(cpPath, exist_ok=True)
 
-    checkpointer_ae = ModelCheckpoint(filepath=(cpPath+"{epoch:02d}_{loss:.2f}.h5"), monitor='loss', verbose=1)
+    checkpointer = ModelCheckpoint(filepath=(cpPath+"unet_model_{epoch:02d}_{loss:.2f}.h5"), monitor='loss', verbose=1)
 
-    model.fit_generator(
+    history = model.fit_generator(
         train_generator,
         epochs=100, verbose=1,
         validation_data=validation_generator,
-        workers=16,
-        callbacks=[es,
-        keras.callbacks.ModelCheckpoint(bestmodelPath, save_weights_only=True, save_best_only=True, mode='min')]
+        workers=8,
+        callbacks=[checkpointer]
+        # keras.callbacks.ModelCheckpoint(bestmodelPath, save_weights_only=True, save_best_only=True, mode='min')]
     )
+
+    with open('./{region}_{train_type}_trainHistoryDict', 'wb') as file_pi:
+        pickle.dump(history.history, file_pi)
 
     model.save(f"./unet_model_{region}_{train_type}.h5")
 
-    # print("Testing")
-    score=model.evaluate(test_generator, verbose=2)
+    print("Testing")
+    score = model.evaluate(test_generator, verbose=2)
     print(score)
+
+    with open(f"./score_unet_model_{region}_{train_type}.txt", "w+") as f:
+        f.write(f"{score}")
 
 def main():
     parser = argparse.ArgumentParser(description="Generate a tuned unet model")
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose debugging", default=False)
     # Custom
-    parser.add_argument("--num_classes", action="store", dest="num_classes", type=str, help="Number of classes", required=True)
     parser.add_argument("--gpu", action="store", dest="gpuid", type=int, help="GPU to use", required=True)
     # Experiment argument
     parser.add_argument("--region", action="store",dest="region", type=str, required=True)
+    parser.add_argument("--traintype", action="store",dest="traintype", type=str, required=True)
 
     args = parser.parse_args(sys.argv[1:])
     args.batch_size=10
@@ -198,7 +206,7 @@ def main():
 
     start_time = float(time.time())
 
-    train_model_from_points(int(args.num_classes), args.region)
+    train_model_from_points(args.traintype, args.region)
 
     print("Finished in %0.4f seconds" % (time.time() - start_time))
     
@@ -207,4 +215,7 @@ def main():
 if __name__ == "__main__":
     main()
 
-# python3 generate_unet_model.py --num_classes 2 --gpu 1 --exp unet_test
+# python3 generate_unet_model.py --gpu 0 --region m_38075 --traintype random
+# python3 generate_unet_model.py --gpu 1 --region m_38075 --traintype balanced
+# python3 generate_unet_model.py --gpu 2 --region exp2 --traintype random
+# python3 generate_unet_model.py --gpu 3 --region exp2 --traintype balanced
