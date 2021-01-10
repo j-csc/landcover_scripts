@@ -4,77 +4,6 @@ import os
 import glob
 import rasterio
 
-class ChickenDataGenerator(keras.utils.Sequence):
-    def __init__(
-        self,
-        dataset_dir, # e.g. os.path.join(data_root, region, "train")
-        batch_size,
-        steps_per_epoch = None,
-        shuffle=True,
-        input_size=256,
-        output_size=256,
-        num_channels=4,
-        num_classes=2,
-        data_type="uint16",
-    ):
-        """Initialization"""
-        
-        self.dataset_dir = dataset_dir
-
-        self.batch_size = batch_size
-
-        self.input_size = input_size
-        self.output_size = output_size
-    
-        self.num_channels = num_channels
-        self.num_classes = num_classes
-
-        self.img_names = np.array(list(glob.glob(os.path.join(self.dataset_dir, "img", "*"))))
-        self.mask_names = np.array(list(glob.glob(os.path.join(self.dataset_dir, "mask", "*"))))
-
-        if steps_per_epoch is not None:
-            self.steps_per_epoch = steps_per_epoch
-        else:
-            self.steps_per_epoch = len(self.img_names)//batch_size # ??? probably handle last batch size    
-
-        self.shuffle = shuffle
-
-        self.on_epoch_end()
-
-    def __len__(self):
-        """Denotes the number of batches per epoch"""
-        return self.steps_per_epoch
-
-    def __getitem__(self, index):
-        """Generate one batch of data"""
-        indices = self.indices[index * self.batch_size : (index + 1) * self.batch_size]
-        img_names = self.img_names[indices]
-        mask_names = self.mask_names[indices]
-        x_batch = np.zeros(
-            (self.batch_size, self.input_size, self.input_size, self.num_channels),
-            dtype=np.float32,
-        )
-        y_batch = np.zeros(
-            (self.batch_size, self.output_size, self.output_size, self.num_classes),
-            dtype=np.float32,
-        )
-
-        for i, (img_file, mask_file) in enumerate(zip(img_names, mask_names)):
-            data = np.load(img_file).squeeze()
-            data /= 255.0
-            x_batch[i] = data[:,:,:self.num_channels]
-            mask_data = np.load(mask_file)
-            y_batch[i] = mask_data
-
-        return x_batch, y_batch
-
-    def on_epoch_end(self):
-        self.indices = np.arange(len(self.img_names))
-        if self.shuffle:
-            np.random.shuffle(self.indices)
-
-# Datagen for experiments
-
 # TODO, dump to data directory, not this directory
 
 def get_gt_set(train_reg, test_reg, val_reg, gt_set):
@@ -317,28 +246,40 @@ def gen_training_patches_balanced_sep(x_fns, y_fns, width, height, channel, targ
 
     pass
 
-
-
 def main():
     # Sample 50k patches of 240x240 images
     # os.environ["DATA_DIR"]
     # in .bashrc: export DATA_DIR="asdf"
 
-    data_root = "../../../data/jason/gen_data/balanced"
-    random_data_root = "../../../data/jason/gen_data/random"
-    region = "exp2"
-    
-    # region = "m_38075"
+    ## Exp 2
+
     region_dict = {
-            "poultry_region_1": "m_38075", 
-            "poultry_region_2": "m_38076",
-            "poultry_region_3": "m_39075",
-            "non_poultry_region_1": "m_39077",
-            "non_poultry_region_2": "m_38077"
-        }
+        "poultry_region_1": "m_38075", 
+        "poultry_region_2": "m_38076",
+        "poultry_region_3": "m_39075",
+        "non_poultry_region_1": "m_39077",
+        "non_poultry_region_2": "m_38077"
+    }
+
+    data_root = "../../../data/jason/train/balanced"
+    random_data_root = "../../../data/jason/train/random"
+    region = "exp2"
 
     train_reg = [region_dict["poultry_region_1"]]
     test_reg = [region_dict["poultry_region_2"]]
+    val_reg = [region_dict["poultry_region_3"]]
+
+    gen_training_patches_sep("../../../data/jason/datasets/md_100cm_2017",
+     "./binary_raster_md_tif/", 256, 256, 4, 2, 100000, region=region, output_root=random_data_root, train_reg=train_reg, test_reg=test_reg, val_reg=val_reg,  pct_train=0.80, pct_validation=0.15, seed=42)
+
+    gen_training_patches_balanced_sep("../../../data/jason/datasets/md_100cm_2017",
+        "./binary_raster_md_tif/", 256, 256, 4, 2, 100000, region=region, output_root=data_root, train_reg=train_reg, test_reg=test_reg, val_reg=val_reg,  pct_train=0.80, pct_validation=0.15, seed=42)
+
+    ## Exp 3
+    region = "exp3"
+
+    train_reg = [region_dict["poultry_region_1"], region_dict["non_poultry_region_1"]]
+    test_reg = [region_dict["poultry_region_2"], region_dict["non_poultry_region_2"]]
     val_reg = [region_dict["poultry_region_3"]]
 
     gen_training_patches_sep("../../../data/jason/datasets/md_100cm_2017",

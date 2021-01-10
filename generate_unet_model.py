@@ -64,7 +64,7 @@ from keras.preprocessing.image import ImageDataGenerator
 from keras.callbacks import ModelCheckpoint, EarlyStopping
 import pandas as pd
 import segmentation_models as sm
-import generate_training_patches_segmentation
+# import generate_training_patches_segmentation
 import generate_training_patches
 
 # Sample: python generate_tuned_model_v3.py --in_model_path_ae ./naip_autoencoder.h5  --out_model_path_ae ./naip_autoencoder_tuned.h5 --num_classes 2 --gpu 1 --exp test_run --exp_type single_tile_4000s
@@ -115,7 +115,8 @@ def get_model(num_classes):
     
     return model
 
-def train_model_from_points(num_classes, exp):
+# Train_type: random or balanced, region: m_38075, exp2 - 4 
+def train_model_from_points(num_classes, train_type, region):
     # UNet tuning
 
     print("Tuning Unet model")
@@ -131,9 +132,8 @@ def train_model_from_points(num_classes, exp):
     test_ratio = 0.05
 
     # gen is 1d binary classification, gen_data is one hot encoded -> [0 1]
-    data_root = "../../../data/jason/gen_data/random"
-    data_random_root = "../../../data/jason/gen_data/random"
-    region = "all"
+    data_root = f"../../../data/jason/train/{train_type}"
+    data_random_root = "../../../data/jason/train/random"
 
     train_generator = ChickenDataGenerator(
         dataset_dir=os.path.join(data_root, region, "train"),
@@ -155,20 +155,25 @@ def train_model_from_points(num_classes, exp):
         steps_per_epoch=None,
         shuffle=False
         )
-    # import IPython; import sys; IPython.embed(); sys.exit(1)
-    es = EarlyStopping(monitor='iou_score', min_delta=0.005, patience=2)
-    # import IPython; import sys; IPython.embed(); sys.exit(1)
+    
+    es = EarlyStopping(monitor='iou_score', min_delta=0.0005, patience=2)
+
+    cpPath = f"{region}_exp/{train_type}/unet_model_"
+
+    bestmodelPath = f"./best_mode_{region}_{train_type}.h5"
+
+    checkpointer_ae = ModelCheckpoint(filepath=(cpPath+"{epoch:02d}_{loss:.2f}.h5"), monitor='loss', verbose=1)
 
     model.fit_generator(
         train_generator,
         epochs=100, verbose=1,
         validation_data=validation_generator,
         workers=16,
-        callbacks=[
-        keras.callbacks.ModelCheckpoint('./best_mode_exp4_all_random.h5', save_weights_only=True, save_best_only=True, mode='min')]
+        callbacks=[es,
+        keras.callbacks.ModelCheckpoint(bestmodelPath, save_weights_only=True, save_best_only=True, mode='min')]
     )
 
-    model.save("./unet_model_exp4_random.h5")
+    model.save(f"./unet_model_{region}_{train_type}.h5")
 
     # print("Testing")
     score=model.evaluate(test_generator, verbose=2)
@@ -181,7 +186,7 @@ def main():
     parser.add_argument("--num_classes", action="store", dest="num_classes", type=str, help="Number of classes", required=True)
     parser.add_argument("--gpu", action="store", dest="gpuid", type=int, help="GPU to use", required=True)
     # Experiment argument
-    parser.add_argument("--exp", action="store",dest="exp", type=str, required=True)
+    parser.add_argument("--region", action="store",dest="region", type=str, required=True)
 
     args = parser.parse_args(sys.argv[1:])
     args.batch_size=10
@@ -193,7 +198,7 @@ def main():
 
     start_time = float(time.time())
 
-    train_model_from_points(int(args.num_classes), args.exp)
+    train_model_from_points(int(args.num_classes), args.region)
 
     print("Finished in %0.4f seconds" % (time.time() - start_time))
     
