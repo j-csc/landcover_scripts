@@ -104,7 +104,7 @@ def get_model():
     # K.clear_session()
     model = sm.Unet(input_shape=(None,None,4), classes = 2, activation='softmax', encoder_weights=None)
 
-    optimizer = Adam(lr=0.0001)
+    optimizer = Adam(lr=0.001)
 
     metrics = [sm.metrics.IOUScore(class_indexes=1), sm.metrics.FScore(beta=1), sm.metrics.Precision(class_indexes=1), sm.metrics.Recall(class_indexes=1)]
 
@@ -170,7 +170,7 @@ def train_model_from_points(train_type, region):
         train_generator,
         epochs=100, verbose=1,
         validation_data=validation_generator,
-        workers=8,
+        workers=4,
         callbacks=[checkpointer]
         # keras.callbacks.ModelCheckpoint(bestmodelPath, save_weights_only=True, save_best_only=True, mode='min')]
     )
@@ -215,7 +215,7 @@ def main():
 if __name__ == "__main__":
     main()
 
-# python3 generate_unet_model.py --gpu 0 --region m_38075 --traintype random
-# python3 generate_unet_model.py --gpu 1 --region m_38075 --traintype balanced
-# python3 generate_unet_model.py --gpu 2 --region exp2 --traintype random
-# python3 generate_unet_model.py --gpu 3 --region exp2 --traintype balanced
+# python3 generate_unet_model.py --gpu 1 --region m_38075 --traintype random
+# python3 generate_unet_model.py --gpu 2 --region m_38075 --traintype balanced
+# python3 generate_unet_model.py --gpu 3 --region exp2 --traintype random
+# python3 generate_unet_model.py --gpu 1 --region exp2 --traintype balanced
