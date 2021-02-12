@@ -74,7 +74,7 @@ from keras.preprocessing.image import ImageDataGenerator
 from keras.callbacks import ModelCheckpoint, EarlyStopping
 import pandas as pd
 import segmentation_models as sm
-import generate_training_patches_segmentation
+# import generate_training_patches_segmentation
 import generate_training_patches
 
 # Sample: python generate_tuned_model_v3.py --in_model_path_ae ./naip_autoencoder.h5  --out_model_path_ae ./naip_autoencoder_tuned.h5 --num_classes 2 --gpu 1 --exp test_run --exp_type single_tile_4000s
@@ -91,7 +91,12 @@ def get_model():
 
     optimizer = Adam(lr=0.0001)
 
-    metrics = [sm.metrics.IOUScore(class_indexes=1), sm.metrics.FScore(beta=1), sm.metrics.Precision(class_indexes=1), sm.metrics.Recall(class_indexes=1)]
+    iou_only = sm.metrics.IOUScore(name="iou_score_only")
+    precision_only = sm.metrics.Precision(name="precision_only")
+    recall_only = sm.metrics.Recall(name="recall_only")
+
+    metrics = [sm.metrics.IOUScore(class_indexes=1), sm.metrics.FScore(beta=1), sm.metrics.Precision(class_indexes=1),
+     sm.metrics.Recall(class_indexes=1), iou_only, precision_only, recall_only]
 
     # jaccardLoss = sm.losses.JaccardLoss(class_indexes=1)
     bceLoss = sm.losses.BinaryCELoss()
@@ -123,6 +128,34 @@ def get_loss(mask_value):
 
         return K.sum(loss) / K.sum(mask)
     return masked_categorical_crossentropy
+
+def bulk_test_model(test_model_list, res_file):
+    np.random.seed(42)
+
+    # Load generator
+
+    data_root = "../../../data/jason/train/random"
+    region = "m_38075"
+    
+    test_generator = ChickenDataGenerator(
+        dataset_dir=os.path.join(data_root, region, "test"),
+        batch_size=10,
+        shuffle=False
+    )
+
+    # Load model
+
+    res = {}
+
+    model = get_model()
+    for model_fn in (test_model_list):
+        model.load_weights(model_fn)
+        print(f"Evaluating {model_fn}")
+        score = model.evaluate(test_generator, verbose=3)
+        res[model_fn] = score
+
+    with open(res_file, 'w') as file:
+        file.write(json.dumps(res))
 
 def test_model(model_fn):
     # UNet tuning
@@ -163,21 +196,49 @@ def test_model(model_fn):
     print(score)
     # import IPython; import sys; IPython.embed(); sys.exit(1)
     
-
 def main():
     parser = argparse.ArgumentParser(description="Generate a tuned unet model")
     args = do_args(sys.argv[1:], "Test")
     
     model_fn = args.model_fn
 
-
     os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
     os.environ["CUDA_VISIBLE_DEVICES"] = str(3)
-    os.environ['TF_CPP_MIN_LOG_LEVEL'] = "3"
+    os.environ['TF_CPP_MIN_LOG_LEVEL'] = "1"
 
     start_time = float(time.time())
 
-    test_model(model_fn=model_fn)
+    # test_model(model_fn=model_fn)
+
+    test_balanced = [
+        './m_38075_exp/balanced/unet_model_01_0.02.h5', './m_38075_exp/balanced/unet_model_05_0.01.h5',
+        './m_38075_exp/balanced/unet_model_10_0.00.h5', './m_38075_exp/balanced/unet_model_15_0.00.h5',
+        './m_38075_exp/balanced/unet_model_20_0.00.h5', './m_38075_exp/balanced/unet_model_25_0.00.h5',
+        './m_38075_exp/balanced/unet_model_30_0.00.h5', './m_38075_exp/balanced/unet_model_35_0.00.h5', 
+        './m_38075_exp/balanced/unet_model_40_0.00.h5', './m_38075_exp/balanced/unet_model_45_0.00.h5',
+        './m_38075_exp/balanced_50/unet_model_01_0.00.h5', './m_38075_exp/balanced_50/unet_model_05_0.00.h5',
+        './m_38075_exp/balanced_50/unet_model_10_0.00.h5','./m_38075_exp/balanced_50/unet_model_15_0.00.h5',
+        './m_38075_exp/balanced_50/unet_model_20_0.00.h5','./m_38075_exp/balanced_50/unet_model_25_0.00.h5',
+        './m_38075_exp/balanced_50/unet_model_30_0.00.h5','./m_38075_exp/balanced_50/unet_model_35_0.00.h5',
+        './m_38075_exp/balanced_50/unet_model_40_0.00.h5', './m_38075_exp/balanced_50/unet_model_45_0.00.h5',
+        './m_38075_exp/balanced_50/unet_model_50_0.00.h5'
+    ]
+    test_random = [
+        './m_38075_exp/random/unet_model_01_0.01.h5', './m_38075_exp/random/unet_model_05_0.00.h5',
+        './m_38075_exp/random/unet_model_10_0.00.h5', './m_38075_exp/random/unet_model_15_0.00.h5',
+        './m_38075_exp/random/unet_model_20_0.00.h5', './m_38075_exp/random/unet_model_25_0.00.h5',
+        './m_38075_exp/random/unet_model_30_0.00.h5', './m_38075_exp/random/unet_model_35_0.00.h5', 
+        './m_38075_exp/random_39/unet_model_03_0.00.h5', './m_38075_exp/random_39/unet_model_08_0.00.h5',
+        './m_38075_exp/random_39/unet_model_13_0.00.h5', './m_38075_exp/random_39/unet_model_18_0.00.h5',
+        './m_38075_exp/random_39/unet_model_23_0.00.h5', './m_38075_exp/random_39/unet_model_28_0.00.h5',
+        './m_38075_exp/random_39/unet_model_33_0.00.h5', './m_38075_exp/random_39/unet_model_38_0.00.h5',
+        './m_38075_exp/random_39/unet_model_43_0.00.h5', './m_38075_exp/random_39/unet_model_48_0.00.h5',
+        './m_38075_exp/random_39/unet_model_53_0.00.h5', './m_38075_exp/random_39/unet_model_58_0.00.h5',
+        './m_38075_exp/random_39/unet_model_63_0.00.h5'
+    ]
+
+    # bulk_test_model(test_random, './m38075_random_test_res.txt')
+    bulk_test_model(test_balanced, './m38075_balanced_test_res.txt')
 
     print("Finished in %0.4f seconds" % (time.time() - start_time))
     

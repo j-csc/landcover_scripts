@@ -57,6 +57,7 @@ import tensorflow.keras.backend as K
 import keras.callbacks
 import keras.utils
 import tensorflow as tf
+from keras.models import load_model
 from keras.optimizers import SGD, Adam, RMSprop, Adadelta
 from keras.layers import Input, Dense, Activation, MaxPooling2D, Conv2D, BatchNormalization
 from keras.layers import Concatenate, Cropping2D, Lambda
@@ -104,7 +105,7 @@ def get_model():
     # K.clear_session()
     model = sm.Unet(input_shape=(None,None,4), classes = 2, activation='softmax', encoder_weights=None)
 
-    optimizer = Adam(lr=0.001)
+    optimizer = Adam(lr=0.0001)
 
     metrics = [sm.metrics.IOUScore(class_indexes=1), sm.metrics.FScore(beta=1), sm.metrics.Precision(class_indexes=1), sm.metrics.Recall(class_indexes=1)]
 
@@ -124,6 +125,7 @@ def train_model_from_points(train_type, region):
 
     model = get_model()
     model.summary()
+    # model.load_weights('./exp2_exp/random/unet_model_23_0.00.h5')
 
     # Load in sample
     print("Loading tiles...")
@@ -164,13 +166,13 @@ def train_model_from_points(train_type, region):
     if not os.path.exists(cpPath):
         os.makedirs(cpPath, exist_ok=True)
 
-    checkpointer = ModelCheckpoint(filepath=(cpPath+"unet_model_{epoch:02d}_{loss:.2f}.h5"), monitor='loss', verbose=1)
+    checkpointer = ModelCheckpoint(filepath=(cpPath+"unet_model_{epoch:02d}_{loss:.2f}.h5"),save_weights_only=True, monitor='loss', verbose=1)
 
     history = model.fit_generator(
         train_generator,
         epochs=100, verbose=1,
         validation_data=validation_generator,
-        workers=4,
+        workers=8,
         callbacks=[checkpointer]
         # keras.callbacks.ModelCheckpoint(bestmodelPath, save_weights_only=True, save_best_only=True, mode='min')]
     )
@@ -218,4 +220,8 @@ if __name__ == "__main__":
 # python3 generate_unet_model.py --gpu 1 --region m_38075 --traintype random
 # python3 generate_unet_model.py --gpu 2 --region m_38075 --traintype balanced
 # python3 generate_unet_model.py --gpu 3 --region exp2 --traintype random
-# python3 generate_unet_model.py --gpu 1 --region exp2 --traintype balanced
+# python3 generate_unet_model.py --gpu 0 --region exp2 --traintype balanced
+
+
+# python3 generate_unet_model.py --gpu 1 --region m_38075_rotation --traintype random
+# python3 generate_unet_model.py --gpu 2 --region m_38075_rotation --traintype balanced

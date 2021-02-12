@@ -11,7 +11,6 @@
 # Stdlib imports
 import sys
 import os
-import custom_loss
 
 
 # Here we look through the args to find which GPU we should use
@@ -126,13 +125,13 @@ def do_args(arg_list, name):
 
     return parser.parse_args(arg_list)
 
-def get_model(num_classes):
+def get_model():
     # K.clear_session()
-    model = sm.Unet(input_shape=(None,None,4), classes = 1, activation='sigmoid', encoder_weights=None)
+    model = sm.Unet(input_shape=(None,None,4), classes = 2, activation='softmax', encoder_weights=None)
 
     optimizer = Adam(lr=0.0001)
 
-    metrics = [sm.metrics.IOUScore(smooth=1e-05), sm.metrics.FScore(beta=1), sm.metrics.Precision(), sm.metrics.Recall()]
+    metrics = [sm.metrics.IOUScore(class_indexes=1), sm.metrics.FScore(beta=1), sm.metrics.Precision(class_indexes=1), sm.metrics.Recall(class_indexes=1)]
 
     # jaccardLoss = sm.losses.JaccardLoss(class_indexes=1)
     bceLoss = sm.losses.BinaryCELoss()
@@ -161,20 +160,20 @@ def main():
     for fn in input_fns:
         assert os.path.exists(fn), "Input does not exist: %s" % (fn)
 
-    model = keras.models.load_model(model_fn, custom_objects={
-        "jaccard_loss":keras.metrics.mean_squared_error,
-        "loss":keras.metrics.mean_squared_error,
-        "masked_categorical_crossentropy":keras.metrics.mean_squared_error,
-        "custom_loss_fn": keras.metrics.mean_squared_error,
-        "iou_coef": keras.metrics.mean_squared_error,
-        "iou_score": sm.metrics.IOUScore(),
-        'f1-score': keras.metrics.mean_squared_error,
-        'precision': keras.metrics.mean_squared_error,
-        'recall': keras.metrics.mean_squared_error,
-        'categorical_crossentropy_plus_jaccard_loss': keras.metrics.mean_squared_error,
-    })
+    # model = keras.models.load_model(model_fn, custom_objects={
+    #     "jaccard_loss":keras.metrics.mean_squared_error,
+    #     "loss":keras.metrics.mean_squared_error,
+    #     "masked_categorical_crossentropy":keras.metrics.mean_squared_error,
+    #     "custom_loss_fn": keras.metrics.mean_squared_error,
+    #     "iou_coef": keras.metrics.mean_squared_error,
+    #     "iou_score": sm.metrics.IOUScore(),
+    #     'f1-score': keras.metrics.mean_squared_error,
+    #     'precision': keras.metrics.mean_squared_error,
+    #     'recall': keras.metrics.mean_squared_error,
+    #     'categorical_crossentropy_plus_jaccard_loss': keras.metrics.mean_squared_error,
+    # })
 
-    # model = get_model(1)
+    model = get_model()
     # model.load_weights(model_fn)
 
     output_shape = model.output_shape[1:]
@@ -226,4 +225,4 @@ if __name__ == "__main__":
 
 # m_3807537_nw_18_1_20170611.tif
 
-# python3 test_in.py --input_fns ../../../data/jason/datasets/md_100cm_2017/38075/m_3807537_nw_18_1_20170611.tif --output_fns ./test_random.tif --model unet_model_exp1_random.h5
+# python3 unet_test_inference.py --input_fns ../../../data/jason/datasets/md_100cm_2017/38075/m_3807537_nw_18_1_20170611.tif --output_fns ./test_random.tif --model ../../../data/jason/m_38075_exp/balanced/unet_model_49_0.00.h5 --gpu 1

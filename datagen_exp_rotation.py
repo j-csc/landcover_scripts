@@ -6,91 +6,13 @@ import keras.utils
 import os
 from PIL import Image
 import scipy.misc
-import wandb
+# import wandb
+from scipy.ndimage import rotate
 
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 
-# TODO:
-# data loader
-# shuffling data loader
-# train-test split loader
-# check if there is a good dataloader for this (images + labels)
 
-
-class ChickenDataGenerator(keras.utils.Sequence):
-    def __init__(
-        self,
-        dataset_dir, # e.g. os.path.join(data_root, region, "train")
-        batch_size,
-        steps_per_epoch = None,
-        shuffle=False,
-        input_size=256,
-        output_size=256,
-        num_channels=4,
-        num_classes=2,
-        data_type="uint16",
-        rotation=False
-    ):
-        """Initialization"""
-        
-        self.dataset_dir = dataset_dir
-
-        self.batch_size = batch_size
-
-        self.input_size = input_size
-        self.output_size = output_size
-    
-        self.num_channels = num_channels
-        self.num_classes = num_classes
-
-        self.img_names = np.array(sorted(list(glob.glob(os.path.join(self.dataset_dir, "img", "*")))))
-        self.mask_names = np.array(sorted(list(glob.glob(os.path.join(self.dataset_dir, "mask", "*")))))
-
-        if steps_per_epoch is not None:
-            self.steps_per_epoch = steps_per_epoch
-        else:
-            self.steps_per_epoch = len(self.img_names)//batch_size # ??? probably handle last batch size    
-
-        self.shuffle = shuffle
-        self.rotation = rotation
-
-        self.on_epoch_end()
-
-    def __len__(self):
-        """Denotes the number of batches per epoch"""
-        return self.steps_per_epoch
-
-    def __getitem__(self, index):
-        """Generate one batch of data"""
-        indices = self.indices[index * self.batch_size : (index + 1) * self.batch_size]
-        img_names = self.img_names[indices]
-        mask_names = self.mask_names[indices]
-        x_batch = np.zeros(
-            (self.batch_size, self.input_size, self.input_size, self.num_channels),
-            dtype=np.float32,
-        )
-        y_batch = np.zeros(
-            (self.batch_size, self.output_size, self.output_size, self.num_classes),
-            dtype=np.float32,
-        )
-
-        for i, (img_file, mask_file) in enumerate(zip(img_names, mask_names)):
-            data = np.load(img_file).squeeze()
-            data /= 255.0
-            x_batch[i] = data[:,:,:self.num_channels]
-            mask_data = np.load(mask_file)
-            y_batch[i] = mask_data
-
-        return x_batch, y_batch
-
-    def on_epoch_end(self):
-        self.indices = np.arange(len(self.img_names))
-        if self.shuffle:
-            np.random.shuffle(self.indices)
-
-# TODO, dump to data directory, not this directory
-
-def gen_training_patches(x_fns, y_fns, width, height, channel, target, total_num_samples, region, output_root="./data", pct_train=0.80, pct_validation=0.15, seed=42):
+def gen_training_patches(x_fns, y_fns, width, height, channel, target, total_num_samples, region, output_root, all, output_region=None, pct_train=0.80, pct_validation=0.15, seed=42):
     """
     output_root is directory to write data to (img, masks)
     output_root / region
@@ -109,6 +31,10 @@ def gen_training_patches(x_fns, y_fns, width, height, channel, target, total_num
 
     # Output
     output_data_dir = os.path.join(output_root, region)
+
+    if output_region != None:
+        output_data_dir = os.path.join(output_root, output_region)
+
     if not os.path.exists(output_data_dir):
         os.makedirs(output_data_dir, exist_ok=True)
 
@@ -128,7 +54,9 @@ def gen_training_patches(x_fns, y_fns, width, height, channel, target, total_num
         
     ground_truth_set = glob.glob(y_fns + "*")
 
-    ground_truth_set = [x for x in ground_truth_set if region in x]
+
+    if all==False:
+        ground_truth_set = [x for x in ground_truth_set if region in x]
 
     count = 0
     non_zero_count = 0
@@ -137,10 +65,9 @@ def gen_training_patches(x_fns, y_fns, width, height, channel, target, total_num
     while count < total_num_samples:
         # Randomly choose a file from input list
         y_fn = np.random.choice(ground_truth_set)
-        folder_name = y_fn.split('/')[2][2:7]
-        filename = y_fn.split('/')[2][:26]
+        folder_name = y_fn.split('/')[6][2:7]
+        filename = y_fn.split('/')[6][:26]
         x_fn = x_fns + f"/{folder_name}/" + filename + ".tif"
-        # print(x_fn)
 
         # Load input file
         f = rasterio.open(x_fn, "r")
@@ -177,9 +104,17 @@ def gen_training_patches(x_fns, y_fns, width, height, channel, target, total_num
             # Set up x_batch with img data at y,x coords
             img = data[y-(height//2):y+(height//2), x-(width//2):x+(width//2), :].astype(np.float32)
 
-            
             # FOR DENSE
             mask = target_one_hot[y-(height//2):y+(height//2), x-(width//2):x+(width//2)]
+
+            angle = np.random.randint(0,360)
+
+            img = rotate(img, angle=angle, reshape=False)
+            img = img[181-(256//2):181+(256//2),181-(256//2):181+(256//2),:]
+            # import pdb; pdb.set_trace(); sys.exit(1)
+
+            mask = rotate(mask, angle=angle, reshape=False)
+            mask = mask[181-(256//2):181+(256//2),181-(256//2):181+(256//2)]
 
             # Dump out img, target_one_hot to file
             partition_name = all_partition_names[count]
@@ -203,7 +138,7 @@ def gen_training_patches(x_fns, y_fns, width, height, channel, target, total_num
 
 
 # TODO, dump to data directory, not this directory
-def gen_training_patches_balanced(x_fns, y_fns, width, height, channel, target, total_num_samples, region, output_root="./data/balanced", pct_train=0.80, pct_validation=0.15, seed=42):
+def gen_training_patches_balanced(x_fns, y_fns, width, height, channel, target, total_num_samples, region, output_root,all,output_region=None, pct_train=0.80, pct_validation=0.15, seed=42):
 
     """
     output_root is directory to write data to (img, masks)
@@ -222,7 +157,14 @@ def gen_training_patches_balanced(x_fns, y_fns, width, height, channel, target, 
     np.random.seed(seed)
 
     # Output
+    
     output_data_dir = os.path.join(output_root, region)
+    
+    if output_region != None:
+        output_data_dir = os.path.join(output_root, output_region)
+
+    print(output_data_dir)
+
     if not os.path.exists(output_data_dir):
         os.makedirs(output_data_dir, exist_ok=True)
     for partition_name in ["train", "validation", "test"]:
@@ -240,7 +182,9 @@ def gen_training_patches_balanced(x_fns, y_fns, width, height, channel, target, 
     np.random.shuffle(all_partition_names)
         
     ground_truth_set = glob.glob(y_fns + "*")
-    ground_truth_set = [x for x in ground_truth_set if region in x]
+
+    if all == False:
+        ground_truth_set = [x for x in ground_truth_set if region in x]
 
     count = 0
     non_zero_count = 0
@@ -249,10 +193,10 @@ def gen_training_patches_balanced(x_fns, y_fns, width, height, channel, target, 
     while count < total_num_samples:
         # Randomly choose a file from input list
         y_fn = np.random.choice(ground_truth_set)
-        folder_name = y_fn.split('/')[2][2:7]
-        filename = y_fn.split('/')[2][:26]
+        folder_name = y_fn.split('/')[6][2:7]
+        filename = y_fn.split('/')[6][:26]
         x_fn = x_fns + f"/{folder_name}/" + filename + ".tif"
-        print(x_fn)
+        # print(x_fn)
 
         # Load input file
         f = rasterio.open(x_fn, "r")
@@ -316,6 +260,14 @@ def gen_training_patches_balanced(x_fns, y_fns, width, height, channel, target, 
             # FOR DENSE
             mask = target_one_hot[y-(height//2):y+(height//2), x-(width//2):x+(width//2)]
 
+            angle = np.random.randint(0,360)
+
+            img = rotate(img, angle=angle, reshape=False)
+            img = img[181-(256//2):181+(256//2),181-(256//2):181+(256//2),:]
+
+            mask = rotate(mask, angle=angle, reshape=False)
+            mask = mask[181-(256//2):181+(256//2),181-(256//2):181+(256//2)]
+
             partition_name = all_partition_names[count]
             img_file = os.path.join(output_data_dir, partition_name, 'img', f"img_{count}")
             mask_file = os.path.join(output_data_dir, partition_name, 'mask', f"mask_{count}")
@@ -343,26 +295,29 @@ def gen_training_patches_balanced(x_fns, y_fns, width, height, channel, target, 
 
 
 def main():
-    # Sample 50k patches of 240x240 images
-    data_root = "../../../data/jason/gen_data/balanced"
-    random_data_root = "../../../data/jason/gen_data/random"
+    ## Exp 5
+    data_root = "../../../data/jason/train/balanced"
+    random_data_root = "../../../data/jason/train/random"
     region = "m_38075"
+    output_region = "m_38075_rotation"
     
     gen_training_patches("../../../data/jason/datasets/md_100cm_2017",
-     "./binary_raster_md_tif/", 256, 256, 4, 2, 100000, region=region, output_root=random_data_root, pct_train=0.80, pct_validation=0.15, seed=42)
+     "../../../data/jason/binary_raster_md_tif/", 362, 362, 4, 2, 100000, region=region, output_root=random_data_root, all=False, output_region=output_region, pct_train=0.80, pct_validation=0.15, seed=42)
 
     gen_training_patches_balanced("../../../data/jason/datasets/md_100cm_2017",
-     "./binary_raster_md_tif/", 256, 256, 4, 2, 100000, region=region, output_root=data_root, pct_train=0.80, pct_validation=0.15, seed=42)
+     "../../../data/jason/binary_raster_md_tif/", 362, 362, 4, 2, 100000, region=region, output_root=data_root, all=False, output_region=output_region, pct_train=0.80, pct_validation=0.15, seed=42)
 
-    # we create two instances with the same arguments
 
-    # train_generator = ChickenDataGenerator(
-    #     dataset_dir=os.path.join(data_root, region, "train"),
-    #     batch_size=2,
-    #     steps_per_epoch=2,
-        # )   
+    ## Exp 8
+    region = "exp8_rotation"
+    output_region = "exp8_rotation"
+    gen_training_patches("../../../data/jason/datasets/md_100cm_2017",
+     "../../../data/jason/binary_raster_md_tif/", 362, 362, 4, 2, 100000, region=region, output_root=random_data_root, all=True, output_region=output_region,  pct_train=0.80, pct_validation=0.15, seed=42)
 
-    # import IPython; import sys; IPython.embed(); sys.exit(1)
+    gen_training_patches_balanced("../../../data/jason/datasets/md_100cm_2017",
+     "../../../data/jason/binary_raster_md_tif/", 362, 362, 4, 2, 100000, region=region, output_root=data_root, all=True,  output_region=output_region, pct_train=0.80, pct_validation=0.15, seed=42)
+
+
     pass
 
 if __name__ == "__main__":
