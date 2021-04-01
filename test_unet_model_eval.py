@@ -15,6 +15,7 @@ import pandas as pd
 import segmentation_models as sm
 import json
 from generate_training_patches import ChickenDataGenerator
+import glob
 
 def get_metrics(y_pred, gt):
     y_pred = y_pred.astype(int)
@@ -22,9 +23,7 @@ def get_metrics(y_pred, gt):
     
     y_true = np.array(gt)
     y_true = y_true.squeeze()
-    
-    uniq = np.unique(y_true)
-    
+        
     tp = np.sum((y_true == 1) & (y_pred == 1))
     tn = np.sum((y_true == 0) & (y_pred == 0))
     fp = np.sum((y_true == 0) & (y_pred == 1))
@@ -35,20 +34,21 @@ def get_metrics(y_pred, gt):
     n = tp + fp + tn + fn
 
     acc = (tp+tn)/n
-    recall = (tp/(tp+fn))
-    precision = tp / (tp + fp)
-    iou = tp /(tp + fn + fp)
 
-    if (tp == 0):
+    if (tp + fn == 0 or tp + fn + fp == 0):
         recall = 1
         precision = 1
         iou = 1
+    else:
+        recall = (tp/(tp+fn))
+        precision = tp / (tp + fp)
+        iou = tp /(tp + fn + fp)
 
-    print("IOU: {}".format(iou))
-    print("Accuracy: {}".format(acc))
-    print("Precision: {}".format(precision))
-    print("Recall: {}".format(recall))
-    return {"IOU": iou, "Accuracy": acc, "Precision": precision, "Recall": recall}
+    # print("IOU: {}".format(iou))
+    # print("Accuracy: {}".format(acc))
+    # print("Precision: {}".format(precision))
+    # print("Recall: {}".format(recall))
+    return {"IOU": float(iou), "Accuracy": float(acc), "Precision": float(precision), "Recall": float(recall), "TP": int(tp), "FP": int(fp), "TN": int(tn), "fn": int(fn)}
 
 def get_model():
     # K.clear_session()
@@ -64,31 +64,87 @@ def get_model():
     
     return model
 
-def main():
-    test_data_root = "../../../../data/jason/test/random"
-    region = "m_38075"
-
+def get_all_model_res(test_data_root, region, model_folder, metrics_folder):
     test_generator = ChickenDataGenerator(
         dataset_dir=os.path.join(test_data_root, region, "test"),
         batch_size=64
     )
-
+    test_models = glob.glob(model_folder + "*")
     model = get_model()
+    sp = model_folder.split("/")
+    output_data_dir = metrics_folder + f'/{sp[5]}/{sp[6]}/'
+    if not os.path.exists(output_data_dir):
+        os.makedirs(output_data_dir, exist_ok=True)
 
-    model.load_weights("../../../../data/jason/m_38075_exp/random/unet_model_35_0.00.h5")
+    test_models = sorted(test_models, reverse=False)
 
-    metrics_dict = []
+    for tm in test_models:
+        # import pdb; pdb.set_trace();
+        fn = output_data_dir + f'{tm.split("/")[7].split(".")[0]}' + '_metrics'
+        print(fn)
+        if (os.path.exists(f'{fn}.json')):
+            pass
+        else:
+            model.load_weights(tm)
+            metrics_dict = {}
 
-    # Testing code
-    for i, (data,img) in enumerate(test_generator):
-        res = model.predict(data)
-        for idx in range(res.shape[0]):
-            ground_truth = img[idx]
-            metric = get_metrics(np.argmax(res[idx],axis=2), np.argmax(ground_truth,axis=2))
-            metrics_dict[i] = (metric)
+            # Testing code
+            for i, (data,img) in enumerate(test_generator):
+                res = model.predict(data)
+                for idx in range(res.shape[0]):
+                    ground_truth = img[idx]
+                    metric = get_metrics(np.argmax(res[idx],axis=2), np.argmax(ground_truth,axis=2))
+                    key_name = f"{i}-{idx}"
+                    metrics_dict[key_name] = (metric)
+
+            # get metrics
+            with open(f'{fn}.json', 'w') as f:
+                json.dump(metrics_dict, f,indent=4)
+
+def main():
+
+    test_data_root = "../../../mnt/sdc/jason/train/random"
+    test_data_root = "../../../data/jason/train/random"
+    region = "exp3"
+    # get_all_model_res(test_data_root, region, "../../../mnt/sdc/jason/rot_exp3_exp/random/", "metrics_folder")
+
+    # region = "exp4"
+    # get_all_model_res(test_data_root, region, "../../../mnt/sdc/jason/exp8_rotation_exp/random/", "metrics_folder")
+
+    # test_models = glob.glob("../../../data/jason/m_38075_rotation_exp/random/" + "*")
+    # print(test_models)
     
-    with open('test.json', 'wb') as f:
-        json.dump(metrics_dict, f)
+
+    # get_all_model_res(test_data_root, region, "../../../data/jason/exp3_exp/random/", "metrics_folder")
+    get_all_model_res(test_data_root, region, "../../../data/jason/exp3_exp/balanced/", "metrics_folder")
+    
+    # get_all_model_res(test_data_root, region, "../../../data/jason/exp2_exp/random/", "metrics_folder")
+    # get_all_model_res(test_data_root, region, "../../../data/jason/exp2_exp/random_24/", "metrics_folder")
+    # get_all_model_res(test_data_root, region, "../../../data/jason/exp2_exp/balanced/", "metrics_folder")
+    # get_all_model_res(test_data_root, region, "../../../data/jason/exp2_exp/balanced_33/", "metrics_folder")
+    # get_all_model_res(test_data_root, region, "../../../mnt/sdc/jason/exp4_exp/balanced/", "metrics_folder")
+    
+    # test_generator = ChickenDataGenerator(
+    #     dataset_dir=os.path.join(test_data_root, region, "test"),
+    #     batch_size=64
+    # )
+
+    # model = get_model()
+
+    # model.load_weights("../../../../data/jason/m_38075_exp/random/unet_model_35_0.00.h5")
+
+    # metrics_dict = []
+
+    # # Testing code
+    # for i, (data,img) in enumerate(test_generator):
+    #     res = model.predict(data)
+    #     for idx in range(res.shape[0]):
+    #         ground_truth = img[idx]
+    #         metric = get_metrics(np.argmax(res[idx],axis=2), np.argmax(ground_truth,axis=2))
+    #         metrics_dict[i] = (metric)
+    
+    # with open('test.json', 'wb') as f:
+    #     json.dump(metrics_dict, f)
 
 if __name__ == "__main__":
     main()

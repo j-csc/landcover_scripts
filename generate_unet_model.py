@@ -18,7 +18,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.utils import class_weight
 import pickle
 
-from generate_training_patches import ChickenDataGenerator
+# from generate_training_patches import ChickenDataGenerastor
 
 # import wandb
 # from wandb.keras import WandbCallback
@@ -70,6 +70,77 @@ import segmentation_models as sm
 import generate_training_patches
 
 # Sample: python generate_tuned_model_v3.py --in_model_path_ae ./naip_autoencoder.h5  --out_model_path_ae ./naip_autoencoder_tuned.h5 --num_classes 2 --gpu 1 --exp test_run --exp_type single_tile_4000s
+
+class ChickenDataGenerator(keras.utils.Sequence):
+    def __init__(
+        self,
+        dataset_dir, # e.g. os.path.join(data_root, region, "train")
+        batch_size,
+        steps_per_epoch = None,
+        shuffle=False,
+        input_size=256,
+        output_size=256,
+        num_channels=4,
+        num_classes=2,
+        data_type="uint16",
+        rotation=False
+    ):
+        """Initialization"""
+        
+        self.dataset_dir = dataset_dir
+
+        self.batch_size = batch_size
+
+        self.input_size = input_size
+        self.output_size = output_size
+    
+        self.num_channels = num_channels
+        self.num_classes = num_classes
+
+        self.img_names = np.array(sorted(list(glob.glob(os.path.join(self.dataset_dir, "img", "*")))))
+        self.mask_names = np.array(sorted(list(glob.glob(os.path.join(self.dataset_dir, "mask", "*")))))
+
+        if steps_per_epoch is not None:
+            self.steps_per_epoch = steps_per_epoch
+        else:
+            self.steps_per_epoch = len(self.img_names)//batch_size # ??? probably handle last batch size    
+
+        self.shuffle = shuffle
+        self.rotation = rotation
+
+        self.on_epoch_end()
+
+    def __len__(self):
+        """Denotes the number of batches per epoch"""
+        return self.steps_per_epoch
+
+    def __getitem__(self, index):
+        """Generate one batch of data"""
+        indices = self.indices[index * self.batch_size : (index + 1) * self.batch_size]
+        img_names = self.img_names[indices]
+        mask_names = self.mask_names[indices]
+        x_batch = np.zeros(
+            (self.batch_size, self.input_size, self.input_size, self.num_channels),
+            dtype=np.float32,
+        )
+        y_batch = np.zeros(
+            (self.batch_size, self.output_size, self.output_size, self.num_classes),
+            dtype=np.float32,
+        )
+
+        for i, (img_file, mask_file) in enumerate(zip(img_names, mask_names)):
+            data = np.load(img_file).squeeze()
+            data /= 255.0
+            x_batch[i] = data[:,:,:self.num_channels]
+            mask_data = np.load(mask_file)
+            y_batch[i] = mask_data
+
+        return x_batch, y_batch
+
+    def on_epoch_end(self):
+        self.indices = np.arange(len(self.img_names))
+        if self.shuffle:
+            np.random.shuffle(self.indices)
 
 def iou_coef(y_true, y_pred, smooth=1):
     # import IPython; import sys; IPython.embed(); sys.exit(1)
@@ -125,7 +196,7 @@ def train_model_from_points(train_type, region):
 
     model = get_model()
     model.summary()
-    # model.load_weights('./exp2_exp/random/unet_model_23_0.00.h5')
+    # model.load_weights('./m_38075_rotation_exp/bxalanced/unet_model_57_-0.00.h5')
 
     # Load in sample
     print("Loading tiles...")
@@ -135,8 +206,8 @@ def train_model_from_points(train_type, region):
     test_ratio = 0.05
 
     # gen is 1d binary classification, gen_data is one hot encoded -> [0 1]
-    data_root = f"../../../data/jason/train/{train_type}"
-    data_random_root = "../../../data/jason/train/random"
+    data_root = f"../../../mnt/sdc/jason/train/{train_type}"
+    data_random_root = "../../../mnt/sdc/jason/train/random"
 
     train_generator = ChickenDataGenerator(
         dataset_dir=os.path.join(data_root, region, "train"),
@@ -152,23 +223,16 @@ def train_model_from_points(train_type, region):
         shuffle=True
         )
     
-    test_generator = ChickenDataGenerator(
-        dataset_dir=os.path.join(data_random_root, region, "test"),
-        batch_size=32,
-        steps_per_epoch=None,
-        shuffle=False
-        )
-    
     # es = EarlyStopping(monitor='iou_score', min_delta=0, patience=2)
 
-    cpPath = f"{region}_exp/{train_type}/"
+    cpPath = f"/mnt/sdc/jason/{region}_exp/{train_type}/"
 
     if not os.path.exists(cpPath):
         os.makedirs(cpPath, exist_ok=True)
 
     checkpointer = ModelCheckpoint(filepath=(cpPath+"unet_model_{epoch:02d}_{loss:.2f}.h5"),save_weights_only=True, monitor='loss', verbose=1)
 
-    history = model.fit_generator(
+    model.fit(
         train_generator,
         epochs=100, verbose=1,
         validation_data=validation_generator,
@@ -177,17 +241,17 @@ def train_model_from_points(train_type, region):
         # keras.callbacks.ModelCheckpoint(bestmodelPath, save_weights_only=True, save_best_only=True, mode='min')]
     )
 
-    with open('./{region}_{train_type}_trainHistoryDict', 'wb') as file_pi:
-        pickle.dump(history.history, file_pi)
+    # with open('./{region}_{train_type}_trainHistoryDict', 'wb') as file_pi:
+    #     pickle.dump(history.history, file_pi)
 
-    model.save(f"./unet_model_{region}_{train_type}.h5")
+    # model.save(f"./unet_model_{region}_{train_type}.h5")
 
-    print("Testing")
-    score = model.evaluate(test_generator, verbose=2)
-    print(score)
+    # print("Testing")
+    # score = model.evaluate(test_generator, verbose=2)
+    # print(score)
 
-    with open(f"./score_unet_model_{region}_{train_type}.txt", "w+") as f:
-        f.write(f"{score}")
+    # with open(f"./score_unet_model_{region}_{train_type}.txt", "w+") as f:
+    #     f.write(f"{score}")
 
 def main():
     parser = argparse.ArgumentParser(description="Generate a tuned unet model")
@@ -221,6 +285,9 @@ if __name__ == "__main__":
 # python3 generate_unet_model.py --gpu 2 --region m_38075 --traintype balanced
 # python3 generate_unet_model.py --gpu 3 --region exp2 --traintype random
 # python3 generate_unet_model.py --gpu 0 --region exp2 --traintype balanced
+
+# python3 generate_unet_model.py --gpu 1 --region exp3 --traintype random
+# python3 generate_unet_model.py --gpu 2 --region exp3 --traintype balanced
 
 
 # python3 generate_unet_model.py --gpu 1 --region m_38075_rotation --traintype random

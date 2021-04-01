@@ -344,14 +344,15 @@ def gen_training_patches_balanced(x_fns, y_fns, width, height, channel, target, 
 
 def main():
     # Sample 50k patches of 240x240 images
-    data_root = "../../../data/jason/gen_data/balanced"
-    random_data_root = "../../../data/jason/gen_data/random"
+    # ../../../mnt/sdc/jason
+    data_root = "../../../mnt/sdc/jason/gen_data/balanced"
+    random_data_root = "../../../mnt/sdc/jason/gen_data/random"
     region = "m_38075"
     
-    gen_training_patches("../../../data/jason/datasets/md_100cm_2017",
+    gen_training_patches("../../../mnt/sdc/jason/datasets/md_100cm_2017",
      "./binary_raster_md_tif/", 256, 256, 4, 2, 100000, region=region, output_root=random_data_root, pct_train=0.80, pct_validation=0.15, seed=42)
 
-    gen_training_patches_balanced("../../../data/jason/datasets/md_100cm_2017",
+    gen_training_patches_balanced("../../../mnt/sdc/jason/datasets/md_100cm_2017",
      "./binary_raster_md_tif/", 256, 256, 4, 2, 100000, region=region, output_root=data_root, pct_train=0.80, pct_validation=0.15, seed=42)
 
     # we create two instances with the same arguments

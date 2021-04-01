@@ -172,12 +172,15 @@ def gen_training_patches_balanced(x_fns, y_fns, width, height, channel, target, 
     non_zero_count = 0
     files_wo_chicken_houses = 0
 
+    # import pdb; pdb.set_trace()
+
     while count < total_num_samples:
         # Randomly choose a file from input list
         y_fn = np.random.choice(ground_truth_set)
-        folder_name = y_fn.split('/')[2][2:7]
-        filename = y_fn.split('/')[2][:26]
+        folder_name = y_fn.split('/')[6][2:7]
+        filename = y_fn.split('/')[6][:26]
         x_fn = x_fns + f"/{folder_name}/" + filename + ".tif"
+        # import pdb; pdb.set_trace(); sys.exit(1)
         print(x_fn)
 
         # Load input file
@@ -270,24 +273,24 @@ def gen_training_patches_balanced(x_fns, y_fns, width, height, channel, target, 
 
 def main():
     ## Exp 1
-    data_root = "../../../data/jason/train/balanced"
+    data_root = "../../../mnt/sdc/jason/train/balanced"
     random_data_root = "../../../data/jason/train/random"
     region = "m_38075"
     
-    gen_training_patches("../../../data/jason/datasets/md_100cm_2017",
-     "./binary_raster_md_tif/", 256, 256, 4, 2, 100000, region=region, output_root=random_data_root, all=False, pct_train=0.80, pct_validation=0.15, seed=42)
+    # gen_training_patches("../../../data/jason/datasets/md_100cm_2017",
+    #  "./binary_raster_md_tif/", 256, 256, 4, 2, 100000, region=region, output_root=random_data_root, all=False, pct_train=0.80, pct_validation=0.15, seed=42)
 
-    gen_training_patches_balanced("../../../data/jason/datasets/md_100cm_2017",
-     "./binary_raster_md_tif/", 256, 256, 4, 2, 100000, region=region, output_root=data_root, all=False, pct_train=0.80, pct_validation=0.15, seed=42)
+    # gen_training_patches_balanced("../../../data/jason/datasets/md_100cm_2017",
+    #  "./binary_raster_md_tif/", 256, 256, 4, 2, 100000, region=region, output_root=data_root, all=False, pct_train=0.80, pct_validation=0.15, seed=42)
 
 
     ## Exp 4
     region = "exp4"
-    gen_training_patches("../../../data/jason/datasets/md_100cm_2017",
-     "./binary_raster_md_tif/", 256, 256, 4, 2, 100000, region=region, output_root=random_data_root, all=True, pct_train=0.80, pct_validation=0.15, seed=42)
+    # gen_training_patches("../../../data/jason/datasets/md_100cm_2017",
+    #  "./binary_raster_md_tif/", 256, 256, 4, 2, 100000, region=region, output_root=random_data_root, all=True, pct_train=0.80, pct_validation=0.15, seed=42)
 
     gen_training_patches_balanced("../../../data/jason/datasets/md_100cm_2017",
-     "./binary_raster_md_tif/", 256, 256, 4, 2, 100000, region=region, output_root=data_root, all=True, pct_train=0.80, pct_validation=0.15, seed=42)
+     "../../../data/jason/binary_raster_md_tif/", 256, 256, 4, 2, 100000, region=region, output_root=data_root, all=True, pct_train=0.80, pct_validation=0.15, seed=42)
 
 
     # import IPython; import sys; IPython.embed(); sys.exit(1)
